@@ -110,6 +110,8 @@ That's it! When your application calls `copilot.NewClient` without a `CLIPath` n
 - `SetForegroundSessionID(ctx context.Context, sessionID string) error` - Request TUI to display a specific session (TUI+server mode only)
 - `On(handler SessionLifecycleHandler) func()` - Subscribe to all lifecycle events; returns unsubscribe function
 - `OnEventType(eventType SessionLifecycleEventType, handler SessionLifecycleHandler) func()` - Subscribe to specific lifecycle event type
+- `CreateCloudSession(options *CloudSessionOptions) (*CloudSession, error)` - Create a sandbox-backed cloud session through Mission Control
+- `ConnectCloudSession(taskOrSessionID string, options *CloudConnectOptions) (*CloudSession, error)` - Attach to an existing Mission Control cloud task
 
 **Session Lifecycle Events:**
 
@@ -182,6 +184,40 @@ Event types: `SessionLifecycleCreated`, `SessionLifecycleDeleted`, `SessionLifec
 - `Destroy() error` - _(Deprecated)_ Use `Disconnect()` instead
 - `UI() *SessionUI` - Interactive UI API for elicitation dialogs
 - `Capabilities() SessionCapabilities` - Host capabilities (e.g. elicitation support)
+
+### CloudSession
+
+A `CloudSession` is a remote-control handle to a cloud sandbox running through Mission Control. It does not spawn a local CLI process.
+
+- `Connect() error` - Fetch initial events and start background polling (called internally by `CreateCloudSession`/`ConnectCloudSession`)
+- `On(handler CloudSessionEventHandler) func()` - Subscribe to events (returns unsubscribe function)
+- `Send(options MessageOptions) error` - Send a user message through the steer API
+- `SendAndWait(options MessageOptions, timeout time.Duration) (*CloudSessionEvent, error)` - Send and wait for session.idle
+- `Abort() error` - Abort the currently running agent work
+- `SubmitRemoteCommand(cmdType MissionControlCommandType, content string) error` - Send a raw steering command
+- `RespondToPermission(payload CloudPermissionResponsePayload) error` - Respond to a permission request
+- `RespondToAskUser(payload CloudAskUserResponsePayload) error` - Respond to an ask-user request
+- `RespondToElicitation(payload CloudElicitationResponsePayload) error` - Respond to an elicitation
+- `RespondToPlanApproval(payload CloudPlanApprovalResponsePayload) error` - Respond to a plan approval
+- `SwitchMode(payload CloudModeSwitchPayload) error` - Switch the session mode
+- `GetMessages() []CloudSessionEvent` - Get all received events
+- `Disconnect()` - Stop polling and release resources
+
+**CloudSessionOptions:**
+
+- `Owner` (string): Billing/authorization owner. Required when `Repository` is omitted.
+- `Repository` (*CloudRepository): Repository context (`Owner`, `Name`, optional `Branch`).
+- `MissionControlBaseURL` (string): Override Mission Control base URL (default: `$COPILOT_MC_BASE_URL` or `$COPILOT_API_BASE_URL/agents`).
+- `FrontendBaseURL` (string): Override GitHub frontend URL (default: `$COPILOT_MC_FRONTEND_URL` or `https://github.com`).
+- `AuthToken` (string): Override auth token (default: `$COPILOT_MC_ACCESS_TOKEN` or `GitHubToken`).
+- `IntegrationID` (string): Override `Copilot-Integration-Id` header (default: `copilot-cli`).
+- `PollIntervalMs` (int): Event poll interval in ms (default: 5000).
+- `InitialEventTimeoutMs` (*int): How long to wait for the first event in ms (default: 10000). Use `Int(0)` to skip waiting.
+- `OnProgress` (func(CloudProgressEvent)): Progress callback.
+- `OnCloudTaskCreated` (func(MissionControlTask)): Called after task creation.
+- `OnEventPollError` (func(error)): Called on poll failures.
+
+**Steering command types:** `CommandUserMessage`, `CommandAskUserResponse`, `CommandPlanApproval`, `CommandPermissionResponse`, `CommandElicitation`, `CommandAbort`, `CommandModeSwitch`
 
 ### Helper Functions
 
@@ -856,6 +892,78 @@ Communicates with CLI via TCP socket. Useful for distributed scenarios.
 ## Environment Variables
 
 - `COPILOT_CLI_PATH` - Path to the Copilot CLI executable
+- `COPILOT_MC_BASE_URL` - Mission Control API base URL (cloud sessions)
+- `COPILOT_API_BASE_URL` - Copilot API base URL (cloud sessions fallback)
+- `COPILOT_MC_FRONTEND_URL` - GitHub frontend base URL (cloud sessions)
+- `COPILOT_MC_ACCESS_TOKEN` - Mission Control auth token (cloud sessions)
+
+## Cloud Sessions
+
+Cloud sessions run agents inside provisioned cloud sandboxes managed by
+Mission Control. The SDK acts as a remote-control client — it creates or
+attaches to a cloud task, polls for events, and steers the agent.
+
+### Create a cloud session (with repository)
+
+```go
+client := copilot.NewClient(&copilot.ClientOptions{
+    AutoStart:   copilot.Bool(false),
+    GitHubToken: "ghp_...",
+})
+
+session, err := client.CreateCloudSession(&copilot.CloudSessionOptions{
+    Repository: &copilot.CloudRepository{
+        Owner: "github",
+        Name:  "copilot-sdk",
+    },
+})
+if err != nil {
+    log.Fatal(err)
+}
+defer session.Disconnect()
+
+session.On(func(event copilot.CloudSessionEvent) {
+    fmt.Println(event.Type)
+})
+
+session.Send(copilot.MessageOptions{Prompt: "Hello cloud!"})
+```
+
+### Create a repo-less cloud session
+
+```go
+session, err := client.CreateCloudSession(&copilot.CloudSessionOptions{
+    Owner: "github",
+})
+```
+
+### Attach to an existing cloud task
+
+```go
+session, err := client.ConnectCloudSession("task-id", nil)
+```
+
+### Steering commands
+
+```go
+// Send a message
+session.Send(copilot.MessageOptions{Prompt: "Fix the bug"})
+
+// Abort current work
+session.Abort()
+
+// Respond to permission / ask-user / elicitation / plan approval
+session.RespondToPermission(copilot.CloudPermissionResponsePayload{
+    PromptID: "p1", Approved: true, Scope: "once",
+})
+session.RespondToAskUser(copilot.CloudAskUserResponsePayload{
+    PromptID: "p2", Answer: "yes", WasFreeform: false,
+})
+session.SwitchMode(copilot.CloudModeSwitchPayload{Mode: "autopilot"})
+
+// Raw steering
+session.SubmitRemoteCommand(copilot.CommandUserMessage, "raw content")
+```
 
 ## License
 
