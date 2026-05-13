@@ -20,7 +20,7 @@
 
 ### Phase 0: Pre-Flight (Before Writing Any Code)
 
-- [ ] **Provision secrets** in `github/copilot-sdk` (see §3A)
+- [ ] **Provision secrets** in `github/copilot-sdk` (see §2A)
 - [ ] **Verify CODEOWNERS team** access
 - [ ] **Check Maven Central Trusted Publisher** — can `github/copilot-sdk` publish to `com.github:copilot-sdk-java`?
 - [ ] **Check GitHub Pages** — is it enabled? Can Java docs coexist?
