@@ -10,6 +10,7 @@
 6. [Migration Plan — Phases](#6-migration-plan--phases)
 7. [Pitfalls and Risk Register](#7-pitfalls-and-risk-register)
 8. [Post-Migration Verification Checklist](#8-post-migration-verification-checklist)
+
 - [Appendix A: Files to Copy vs. Merge vs. Delete](#appendix-a-files-to-copy-vs-merge-vs-delete)
 - [Appendix B: Unique Java Concerns vs Other Languages](#appendix-b-unique-java-concerns-vs-other-languages)
 - [Appendix C: Java Smoketest](#appendix-c-java-smoketest)
@@ -20,48 +21,48 @@
 
 ### 1A. copilot-sdk-java-00 Workflows (Source)
 
-| YAML File Name | Brief Description | Primary Language | Complexity |
-|---|---|---|---|
-| `build-test.yml` | Main CI: Spotless, build, Javadoc, `mvn verify`, JaCoCo coverage badges | Java | L |
-| `codegen-check.yml` | Re-runs Java codegen, commits regenerated files to PRs, triggers agentic fix on failure | Java | M |
-| `codegen-agentic-fix.md` + `.lock.yml` | Agentic: auto-fixes compilation/test failures caused by codegen changes | Java | L |
-| `reference-impl-sync.md` + `.lock.yml` | Agentic: checks for new commits in `github/copilot-sdk`, creates issue for Copilot agent to port | Java | L |
-| `publish-maven.yml` | Publishes release to Maven Central via `maven-release-plugin`, GPG signing, GitHub Release creation | Java | XL |
-| `publish-snapshot.yml` | Publishes SNAPSHOT builds to Maven Central Snapshots on a weekday schedule | Java | M |
-| `deploy-site.yml` | Builds/deploys versioned Maven site docs to GitHub Pages | Java | M |
-| `run-smoke-test.yml` | Builds SDK, installs locally, runs Copilot CLI smoke test on JDK 17 + JDK 25 (see [Appendix C](#appendix-c-java-smoketest)) | Java | M |
-| `update-copilot-dependency.yml` | Updates `@github/copilot` npm dep in codegen, re-runs generator, creates PR | Java | M |
-| `copilot-setup-steps.yml` | Environment setup for Copilot coding agent (JDK 17, Node 22, gh-aw, pre-commit hooks) | Java | S |
-| `agentics-maintenance.yml` | Auto-generated gh-aw maintenance: closes expired discussions/issues/PRs | Cross-language (infra) | S |
-| `notes.template` | Release notes template for Maven Central (not a workflow) | Java | S |
+| YAML File Name                         | Brief Description                                                                                                           | Primary Language       | Complexity |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ---------- |
+| `build-test.yml`                       | Main CI: Spotless, build, Javadoc, `mvn verify`, JaCoCo coverage badges                                                     | Java                   | L          |
+| `codegen-check.yml`                    | Re-runs Java codegen, commits regenerated files to PRs, triggers agentic fix on failure                                     | Java                   | M          |
+| `codegen-agentic-fix.md` + `.lock.yml` | Agentic: auto-fixes compilation/test failures caused by codegen changes                                                     | Java                   | L          |
+| `reference-impl-sync.md` + `.lock.yml` | Agentic: checks for new commits in `github/copilot-sdk`, creates issue for Copilot agent to port                            | Java                   | L          |
+| `publish-maven.yml`                    | Publishes release to Maven Central via `maven-release-plugin`, GPG signing, GitHub Release creation                         | Java                   | XL         |
+| `publish-snapshot.yml`                 | Publishes SNAPSHOT builds to Maven Central Snapshots on a weekday schedule                                                  | Java                   | M          |
+| `deploy-site.yml`                      | Builds/deploys versioned Maven site docs to GitHub Pages                                                                    | Java                   | M          |
+| `run-smoke-test.yml`                   | Builds SDK, installs locally, runs Copilot CLI smoke test on JDK 17 + JDK 25 (see [Appendix C](#appendix-c-java-smoketest)) | Java                   | M          |
+| `update-copilot-dependency.yml`        | Updates `@github/copilot` npm dep in codegen, re-runs generator, creates PR                                                 | Java                   | M          |
+| `copilot-setup-steps.yml`              | Environment setup for Copilot coding agent (JDK 17, Node 22, gh-aw, pre-commit hooks)                                       | Java                   | S          |
+| `agentics-maintenance.yml`             | Auto-generated gh-aw maintenance: closes expired discussions/issues/PRs                                                     | Cross-language (infra) | S          |
+| `notes.template`                       | Release notes template for Maven Central (not a workflow)                                                                   | Java                   | S          |
 
 ### 1B. copilot-sdk-00 Workflows (Target Monorepo)
 
-| YAML File Name | Brief Description | Primary Language | Complexity |
-|---|---|---|---|
-| `nodejs-sdk-tests.yml` | Build + test Node.js SDK on 3 OS, prettier, ESLint, typecheck, E2E | Node.js | L |
-| `dotnet-sdk-tests.yml` | Build + test .NET SDK on 3 OS, format check, E2E via replay proxy | .NET | L |
-| `go-sdk-tests.yml` | Build + test Go SDK on 3 OS, gofmt, golangci-lint, E2E | Go | L |
-| `python-sdk-tests.yml` | Build + test Python SDK on 3 OS, ruff, ty, E2E via pytest | Python | L |
-| `rust-sdk-tests.yml` | Build + test Rust SDK on 3 OS, nightly fmt, clippy, cargo test | Rust | L |
-| `codegen-check.yml` | Verifies generated files across Node, .NET, Python, Go, Rust | Cross-language | M |
-| `publish.yml` | Publishes all SDKs (npm, NuGet, PyPI, Go tags, crates.io) from a single version | Cross-language | XL |
-| `scenario-builds.yml` | Verifies example scenarios build for each language | Cross-language | M |
-| `docs-validation.yml` | Extracts and validates code snippets from `docs/` | Cross-language | M |
-| `update-copilot-dependency.yml` | Updates `@github/copilot` dep, re-runs codegen, opens PR | Cross-language | M |
-| `copilot-setup-steps.yml` | Agent env setup: Node, Python, Go, .NET, Rust, just, gh-aw | Cross-language | M |
-| `verify-compiled.yml` | Ensures `.lock.yml` files match `.md` sources | Cross-language (infra) | S |
-| `collect-corrections.yml` | Collects triage agent feedback | Cross-language (infra) | S |
-| `corrections-tests.yml` | Tests for triage correction scripts | Cross-language (infra) | S |
-| `issue-classification.md` + `.lock.yml` | Agentic: classifies issues → routes to handle-* handlers | Cross-language | M |
-| `issue-triage.md` + `.lock.yml` | Agentic: labels, acknowledges, requests clarification, closes dupes | Cross-language | L |
-| `handle-bug.md` + `.lock.yml` | Agentic: investigates bug issues | Cross-language | M |
-| `handle-documentation.md` + `.lock.yml` | Agentic: handles doc-related issues | Cross-language | S |
-| `handle-enhancement.md` + `.lock.yml` | Agentic: labels enhancement issues | Cross-language | S |
-| `handle-question.md` + `.lock.yml` | Agentic: labels question issues | Cross-language | S |
-| `cross-repo-issue-analysis.md` + `.lock.yml` | Agentic: checks if issue root cause is in copilot-agent-runtime | Cross-language | M |
-| `release-changelog.md` + `.lock.yml` | Agentic: generates release notes, updates CHANGELOG | Cross-language | M |
-| `sdk-consistency-review.md` + `.lock.yml` | Agentic: reviews PRs for cross-SDK feature parity | Cross-language | L |
+| YAML File Name                               | Brief Description                                                               | Primary Language       | Complexity |
+| -------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------- | ---------- |
+| `nodejs-sdk-tests.yml`                       | Build + test Node.js SDK on 3 OS, prettier, ESLint, typecheck, E2E              | Node.js                | L          |
+| `dotnet-sdk-tests.yml`                       | Build + test .NET SDK on 3 OS, format check, E2E via replay proxy               | .NET                   | L          |
+| `go-sdk-tests.yml`                           | Build + test Go SDK on 3 OS, gofmt, golangci-lint, E2E                          | Go                     | L          |
+| `python-sdk-tests.yml`                       | Build + test Python SDK on 3 OS, ruff, ty, E2E via pytest                       | Python                 | L          |
+| `rust-sdk-tests.yml`                         | Build + test Rust SDK on 3 OS, nightly fmt, clippy, cargo test                  | Rust                   | L          |
+| `codegen-check.yml`                          | Verifies generated files across Node, .NET, Python, Go, Rust                    | Cross-language         | M          |
+| `publish.yml`                                | Publishes all SDKs (npm, NuGet, PyPI, Go tags, crates.io) from a single version | Cross-language         | XL         |
+| `scenario-builds.yml`                        | Verifies example scenarios build for each language                              | Cross-language         | M          |
+| `docs-validation.yml`                        | Extracts and validates code snippets from `docs/`                               | Cross-language         | M          |
+| `update-copilot-dependency.yml`              | Updates `@github/copilot` dep, re-runs codegen, opens PR                        | Cross-language         | M          |
+| `copilot-setup-steps.yml`                    | Agent env setup: Node, Python, Go, .NET, Rust, just, gh-aw                      | Cross-language         | M          |
+| `verify-compiled.yml`                        | Ensures `.lock.yml` files match `.md` sources                                   | Cross-language (infra) | S          |
+| `collect-corrections.yml`                    | Collects triage agent feedback                                                  | Cross-language (infra) | S          |
+| `corrections-tests.yml`                      | Tests for triage correction scripts                                             | Cross-language (infra) | S          |
+| `issue-classification.md` + `.lock.yml`      | Agentic: classifies issues → routes to handle-\* handlers                       | Cross-language         | M          |
+| `issue-triage.md` + `.lock.yml`              | Agentic: labels, acknowledges, requests clarification, closes dupes             | Cross-language         | L          |
+| `handle-bug.md` + `.lock.yml`                | Agentic: investigates bug issues                                                | Cross-language         | M          |
+| `handle-documentation.md` + `.lock.yml`      | Agentic: handles doc-related issues                                             | Cross-language         | S          |
+| `handle-enhancement.md` + `.lock.yml`        | Agentic: labels enhancement issues                                              | Cross-language         | S          |
+| `handle-question.md` + `.lock.yml`           | Agentic: labels question issues                                                 | Cross-language         | S          |
+| `cross-repo-issue-analysis.md` + `.lock.yml` | Agentic: checks if issue root cause is in copilot-agent-runtime                 | Cross-language         | M          |
+| `release-changelog.md` + `.lock.yml`         | Agentic: generates release notes, updates CHANGELOG                             | Cross-language         | M          |
+| `sdk-consistency-review.md` + `.lock.yml`    | Agentic: reviews PRs for cross-SDK feature parity                               | Cross-language         | L          |
 
 ---
 
@@ -69,42 +70,42 @@
 
 ### 2A. copilot-sdk-java-00
 
-| Resource | Location | Purpose | Must Migrate? |
-|---|---|---|---|
-| **Agent:** `agentic-workflows.agent.md` | `.github/agents/` | Dispatcher for gh-aw workflow creation/debug | Yes (merge with monorepo version) |
-| **Skill:** `agentic-merge-reference-impl` | `.github/skills/` + `.github/prompts/` | Merges reference impl changes into Java | Yes — **must be reworked** (no longer cross-repo) |
-| **Skill:** `commit-as-pull-request` | `.github/skills/` + `.github/prompts/` | Creates branch, pushes, opens PR | Yes (may already exist in monorepo) |
-| **Skill:** `documentation-coverage` | `.github/skills/` + `.github/prompts/` | Assesses Java docs coverage | Yes |
-| **Prompt:** `coding-agent-merge-reference-impl-instructions.md` | `.github/prompts/` | Instructions for coding agent merge | Yes |
-| **Prompt:** `test-coverage-assessment.prompt.md` | `.github/prompts/` | Test coverage assessment | Yes |
-| **Composite Action:** `setup-copilot` | `.github/actions/setup-copilot/` | Sets up Copilot CLI for Java tests | Yes — **adapt paths** |
-| **Composite Action:** `test-report` | `.github/actions/test-report/` | Test report generation | Yes |
-| **Scripts:** `release/`, `ci/`, `build/`, `reference-impl-sync/` | `.github/scripts/` | Release, CI, sync automation | Yes — **path rewrites** |
-| **Dependabot:** `dependabot.yml` | `.github/` | Maven + GitHub Actions updates | Merge into monorepo's `dependabot.yaml` |
-| **CODEOWNERS** | `.github/` | `@github/copilot-sdk-java` | Merge into monorepo's CODEOWNERS |
-| **Issue Templates:** bug, documentation, feature, maintenance | `.github/ISSUE_TEMPLATE/` | Issue forms | Assess whether monorepo issue triage covers this |
-| **PR Template** | `.github/pull_request_template.md` | PR form | Merge or keep per-language |
-| **Release Config** | `.github/release.yml` | Auto-generated release notes config | Merge |
-| **copilot-instructions.md** | `.github/` | Agent instructions for Java SDK | Merge (scoped to `java/`) |
-| **Site templates** | `.github/templates/` | HTML/CSS for GitHub Pages | Migrate to `java/` |
-| **Coverage badge script** | `.github/scripts/generate-coverage-badge.sh` | JaCoCo badge generation | Migrate |
-| **`.lastmerge`** | repo root | Tracks last merged ref-impl commit | **This concept changes** — see §6 |
-| **`.githooks/pre-commit`** | repo root | Runs `mvn spotless:check` | Migrate to `java/.githooks/` |
-| **`instructions/copilot-sdk-java.instructions.md`** | `instructions/` | VS Code copilot instructions | Move to `java/` |
+| Resource                                                         | Location                                     | Purpose                                      | Must Migrate?                                     |
+| ---------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------- | ------------------------------------------------- |
+| **Agent:** `agentic-workflows.agent.md`                          | `.github/agents/`                            | Dispatcher for gh-aw workflow creation/debug | Yes (merge with monorepo version)                 |
+| **Skill:** `agentic-merge-reference-impl`                        | `.github/skills/` + `.github/prompts/`       | Merges reference impl changes into Java      | Yes — **must be reworked** (no longer cross-repo) |
+| **Skill:** `commit-as-pull-request`                              | `.github/skills/` + `.github/prompts/`       | Creates branch, pushes, opens PR             | Yes (may already exist in monorepo)               |
+| **Skill:** `documentation-coverage`                              | `.github/skills/` + `.github/prompts/`       | Assesses Java docs coverage                  | Yes                                               |
+| **Prompt:** `coding-agent-merge-reference-impl-instructions.md`  | `.github/prompts/`                           | Instructions for coding agent merge          | Yes                                               |
+| **Prompt:** `test-coverage-assessment.prompt.md`                 | `.github/prompts/`                           | Test coverage assessment                     | Yes                                               |
+| **Composite Action:** `setup-copilot`                            | `.github/actions/setup-copilot/`             | Sets up Copilot CLI for Java tests           | Yes — **adapt paths**                             |
+| **Composite Action:** `test-report`                              | `.github/actions/test-report/`               | Test report generation                       | Yes                                               |
+| **Scripts:** `release/`, `ci/`, `build/`, `reference-impl-sync/` | `.github/scripts/`                           | Release, CI, sync automation                 | Yes — **path rewrites**                           |
+| **Dependabot:** `dependabot.yml`                                 | `.github/`                                   | Maven + GitHub Actions updates               | Merge into monorepo's `dependabot.yaml`           |
+| **CODEOWNERS**                                                   | `.github/`                                   | `@github/copilot-sdk-java`                   | Merge into monorepo's CODEOWNERS                  |
+| **Issue Templates:** bug, documentation, feature, maintenance    | `.github/ISSUE_TEMPLATE/`                    | Issue forms                                  | Assess whether monorepo issue triage covers this  |
+| **PR Template**                                                  | `.github/pull_request_template.md`           | PR form                                      | Merge or keep per-language                        |
+| **Release Config**                                               | `.github/release.yml`                        | Auto-generated release notes config          | Merge                                             |
+| **copilot-instructions.md**                                      | `.github/`                                   | Agent instructions for Java SDK              | Merge (scoped to `java/`)                         |
+| **Site templates**                                               | `.github/templates/`                         | HTML/CSS for GitHub Pages                    | Migrate to `java/`                                |
+| **Coverage badge script**                                        | `.github/scripts/generate-coverage-badge.sh` | JaCoCo badge generation                      | Migrate                                           |
+| **`.lastmerge`**                                                 | repo root                                    | Tracks last merged ref-impl commit           | **This concept changes** — see §6                 |
+| **`.githooks/pre-commit`**                                       | repo root                                    | Runs `mvn spotless:check`                    | Migrate to `java/.githooks/`                      |
+| **`instructions/copilot-sdk-java.instructions.md`**              | `instructions/`                              | VS Code copilot instructions                 | Move to `java/`                                   |
 
 ### 2B. copilot-sdk-00
 
-| Resource | Location | Purpose |
-|---|---|---|
-| **Agent:** `agentic-workflows.agent.md` | `.github/agents/` | Same dispatcher (newer version with more routing) |
-| **Agent:** `docs-maintenance.agent.md` | `.github/agents/` | Docs auditor agent |
-| **Skill:** `rust-coding-skill` | `.github/skills/` | Rust-specific coding skill |
-| **Composite Action:** `setup-copilot` | `.github/actions/setup-copilot/` | Sets up Copilot CLI from nodejs package |
-| **Command:** `triage_feedback.yml` | `.github/commands/` | Repository dispatch for triage feedback |
-| **LSP Config:** `lsp.json` | `.github/` | C#, Go language server configs |
-| **Dependabot:** `dependabot.yaml` | `.github/` | npm, pip, gomod, nuget, github-actions, devcontainers |
-| **CODEOWNERS** | `.github/` | `@github/copilot-sdk` |
-| **copilot-instructions.md** | `.github/` | Monorepo-wide agent instructions |
+| Resource                                | Location                         | Purpose                                               |
+| --------------------------------------- | -------------------------------- | ----------------------------------------------------- |
+| **Agent:** `agentic-workflows.agent.md` | `.github/agents/`                | Same dispatcher (newer version with more routing)     |
+| **Agent:** `docs-maintenance.agent.md`  | `.github/agents/`                | Docs auditor agent                                    |
+| **Skill:** `rust-coding-skill`          | `.github/skills/`                | Rust-specific coding skill                            |
+| **Composite Action:** `setup-copilot`   | `.github/actions/setup-copilot/` | Sets up Copilot CLI from nodejs package               |
+| **Command:** `triage_feedback.yml`      | `.github/commands/`              | Repository dispatch for triage feedback               |
+| **LSP Config:** `lsp.json`              | `.github/`                       | C#, Go language server configs                        |
+| **Dependabot:** `dependabot.yaml`       | `.github/`                       | npm, pip, gomod, nuget, github-actions, devcontainers |
+| **CODEOWNERS**                          | `.github/`                       | `@github/copilot-sdk`                                 |
+| **copilot-instructions.md**             | `.github/`                       | Monorepo-wide agent instructions                      |
 
 ---
 
@@ -114,21 +115,21 @@
 
 The Java SDK publish workflow requires secrets that **do not currently exist** in the `copilot-sdk` repo:
 
-| Secret | Used By | Notes |
-|---|---|---|
-| `RELEASE_TOKEN` | `publish-maven.yml` | PAT with `contents:write` for pushing tags/commits during maven-release-plugin |
-| `GPG_SECRET_KEY` | `publish-maven.yml` | GPG private key for signing Maven artifacts |
-| `GPG_PASSPHRASE` | `publish-maven.yml` | Passphrase for the GPG key |
-| `MAVEN_CENTRAL_USERNAME` | `publish-maven.yml`, `publish-snapshot.yml` | Sonatype/Maven Central credentials |
-| `MAVEN_CENTRAL_PASSWORD` | `publish-maven.yml`, `publish-snapshot.yml` | Sonatype/Maven Central credentials |
-| `COPILOT_GITHUB_TOKEN` | `build-test.yml`, `codegen-agentic-fix.lock.yml` | Token for Copilot CLI in CI |
+| Secret                   | Used By                                          | Notes                                                                          |
+| ------------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `RELEASE_TOKEN`          | `publish-maven.yml`                              | PAT with `contents:write` for pushing tags/commits during maven-release-plugin |
+| `GPG_SECRET_KEY`         | `publish-maven.yml`                              | GPG private key for signing Maven artifacts                                    |
+| `GPG_PASSPHRASE`         | `publish-maven.yml`                              | Passphrase for the GPG key                                                     |
+| `MAVEN_CENTRAL_USERNAME` | `publish-maven.yml`, `publish-snapshot.yml`      | Sonatype/Maven Central credentials                                             |
+| `MAVEN_CENTRAL_PASSWORD` | `publish-maven.yml`, `publish-snapshot.yml`      | Sonatype/Maven Central credentials                                             |
+| `COPILOT_GITHUB_TOKEN`   | `build-test.yml`, `codegen-agentic-fix.lock.yml` | Token for Copilot CLI in CI                                                    |
 
 ### 3B. Existing Secrets in copilot-sdk That May Conflict
 
-| Secret | Used By | Concern |
-|---|---|---|
-| `CARGO_REGISTRY_TOKEN` | `publish.yml` (Rust) | No conflict |
-| `GH_AW_GITHUB_TOKEN` / `GH_AW_GITHUB_MCP_SERVER_TOKEN` | Agentic workflows | Likely already present; Java agentic workflows need the same |
+| Secret                                                 | Used By              | Concern                                                      |
+| ------------------------------------------------------ | -------------------- | ------------------------------------------------------------ |
+| `CARGO_REGISTRY_TOKEN`                                 | `publish.yml` (Rust) | No conflict                                                  |
+| `GH_AW_GITHUB_TOKEN` / `GH_AW_GITHUB_MCP_SERVER_TOKEN` | Agentic workflows    | Likely already present; Java agentic workflows need the same |
 
 ### 3C. Permissions / Access to Provision
 
@@ -157,24 +158,24 @@ The monorepo already uses a partially consistent pattern:
 
 #### Language-specific workflow naming: `{language}-{purpose}.yml`
 
-| Current (copilot-sdk) | Current (copilot-sdk-java) | Proposed New Name |
-|---|---|---|
-| `nodejs-sdk-tests.yml` | — | `nodejs-sdk-tests.yml` (keep) |
-| `dotnet-sdk-tests.yml` | — | `dotnet-sdk-tests.yml` (keep) |
-| `go-sdk-tests.yml` | — | `go-sdk-tests.yml` (keep) |
-| `python-sdk-tests.yml` | — | `python-sdk-tests.yml` (keep) |
-| `rust-sdk-tests.yml` | — | `rust-sdk-tests.yml` (keep) |
-| — | `build-test.yml` | **`java-sdk-tests.yml`** |
-| — | `publish-maven.yml` | **`java-publish.yml`** |
-| — | `publish-snapshot.yml` | **`java-publish-snapshot.yml`** |
-| — | `deploy-site.yml` | **`java-deploy-site.yml`** |
-| — | `run-smoke-test.yml` | **`java-smoke-test.yml`** |
-| — | `codegen-check.yml` | **Merge into existing `codegen-check.yml`** (add Java paths + job) |
-| — | `codegen-agentic-fix.md` | **`java-codegen-fix.md`** + `.lock.yml` |
-| — | `reference-impl-sync.md` | **`java-reference-impl-sync.md`** + `.lock.yml` (reworked for intra-repo) |
-| — | `update-copilot-dependency.yml` | **Merge into existing `update-copilot-dependency.yml`** (add Java codegen step) |
-| — | `copilot-setup-steps.yml` | **Merge into existing** (add JDK 17 + Maven setup) |
-| — | `agentics-maintenance.yml` | Already exists via gh-aw in the monorepo; **do not duplicate** |
+| Current (copilot-sdk)  | Current (copilot-sdk-java)      | Proposed New Name                                                               |
+| ---------------------- | ------------------------------- | ------------------------------------------------------------------------------- |
+| `nodejs-sdk-tests.yml` | —                               | `nodejs-sdk-tests.yml` (keep)                                                   |
+| `dotnet-sdk-tests.yml` | —                               | `dotnet-sdk-tests.yml` (keep)                                                   |
+| `go-sdk-tests.yml`     | —                               | `go-sdk-tests.yml` (keep)                                                       |
+| `python-sdk-tests.yml` | —                               | `python-sdk-tests.yml` (keep)                                                   |
+| `rust-sdk-tests.yml`   | —                               | `rust-sdk-tests.yml` (keep)                                                     |
+| —                      | `build-test.yml`                | **`java-sdk-tests.yml`**                                                        |
+| —                      | `publish-maven.yml`             | **`java-publish.yml`**                                                          |
+| —                      | `publish-snapshot.yml`          | **`java-publish-snapshot.yml`**                                                 |
+| —                      | `deploy-site.yml`               | **`java-deploy-site.yml`**                                                      |
+| —                      | `run-smoke-test.yml`            | **`java-smoke-test.yml`**                                                       |
+| —                      | `codegen-check.yml`             | **Merge into existing `codegen-check.yml`** (add Java paths + job)              |
+| —                      | `codegen-agentic-fix.md`        | **`java-codegen-fix.md`** + `.lock.yml`                                         |
+| —                      | `reference-impl-sync.md`        | **`java-reference-impl-sync.md`** + `.lock.yml` (reworked for intra-repo)       |
+| —                      | `update-copilot-dependency.yml` | **Merge into existing `update-copilot-dependency.yml`** (add Java codegen step) |
+| —                      | `copilot-setup-steps.yml`       | **Merge into existing** (add JDK 17 + Maven setup)                              |
+| —                      | `agentics-maintenance.yml`      | Already exists via gh-aw in the monorepo; **do not duplicate**                  |
 
 #### Cross-language workflow naming: `{purpose}.yml` (no language prefix)
 
@@ -204,18 +205,18 @@ Keep existing names: `publish.yml`, `codegen-check.yml`, `scenario-builds.yml`, 
 
 #### Cross-cutting concerns (potential friction points)
 
-| Concern | Current State | Impact on Java |
-|---|---|---|
-| **Shared test harness** (`test/harness/`) | Node.js-based replay proxy used by all E2E tests | Java already uses this (clones it at build time from `copilot-sdk` repo). When in-repo, can reference it directly — **simpler**. |
-| **Shared test snapshots** (`test/snapshots/`) | YAML snapshot files consumed by all languages | Java can share these — **positive change**. |
-| **Unified codegen** (`scripts/codegen/`) | One `package.json` with generators for TS, C#, Python, Go, Rust | Java codegen (`java.ts`) must be **merged in**. The Java codegen currently has its own `package.json` with a direct `@github/copilot` dependency; the monorepo codegen gets it via `nodejs/node_modules`. This needs reconciliation. |
-| **`justfile`** | Has per-language targets (`format-go`, `test-dotnet`, etc.) | Must add `format-java`, `lint-java`, `test-java`, `install-java` targets. |
-| **Unified `publish.yml`** | Single workflow publishes all languages with one version number | **Java CANNOT join this** — Java has its own versioning scheme (`X.Y.Z-java.N`). Java must keep a separate `java-publish.yml`. |
-| **`sdk-consistency-review`** agentic workflow | Reviews PRs for cross-SDK parity (currently watches nodejs, python, go, dotnet) | Must add `java/` to the path triggers and update the agent prompt to include Java. |
-| **`copilot-setup-steps.yml`** | Sets up Node, Python, Go, .NET, Rust | Must add JDK 17 + Maven. |
-| **`copilot-instructions.md`** | Monorepo-wide instructions | Must incorporate Java-specific guidance. |
-| **`CODEOWNERS`** | Single `* @github/copilot-sdk` | Must add `java/ @github/copilot-sdk-java` line. |
-| **`lsp.json`** | Configures C# and Go language servers for Copilot agent | May want to add Java LSP (jdtls or similar) — **optional**. |
+| Concern                                       | Current State                                                                   | Impact on Java                                                                                                                                                                                                                       |
+| --------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Shared test harness** (`test/harness/`)     | Node.js-based replay proxy used by all E2E tests                                | Java already uses this (clones it at build time from `copilot-sdk` repo). When in-repo, can reference it directly — **simpler**.                                                                                                     |
+| **Shared test snapshots** (`test/snapshots/`) | YAML snapshot files consumed by all languages                                   | Java can share these — **positive change**.                                                                                                                                                                                          |
+| **Unified codegen** (`scripts/codegen/`)      | One `package.json` with generators for TS, C#, Python, Go, Rust                 | Java codegen (`java.ts`) must be **merged in**. The Java codegen currently has its own `package.json` with a direct `@github/copilot` dependency; the monorepo codegen gets it via `nodejs/node_modules`. This needs reconciliation. |
+| **`justfile`**                                | Has per-language targets (`format-go`, `test-dotnet`, etc.)                     | Must add `format-java`, `lint-java`, `test-java`, `install-java` targets.                                                                                                                                                            |
+| **Unified `publish.yml`**                     | Single workflow publishes all languages with one version number                 | **Java CANNOT join this** — Java has its own versioning scheme (`X.Y.Z-java.N`). Java must keep a separate `java-publish.yml`.                                                                                                       |
+| **`sdk-consistency-review`** agentic workflow | Reviews PRs for cross-SDK parity (currently watches nodejs, python, go, dotnet) | Must add `java/` to the path triggers and update the agent prompt to include Java.                                                                                                                                                   |
+| **`copilot-setup-steps.yml`**                 | Sets up Node, Python, Go, .NET, Rust                                            | Must add JDK 17 + Maven.                                                                                                                                                                                                             |
+| **`copilot-instructions.md`**                 | Monorepo-wide instructions                                                      | Must incorporate Java-specific guidance.                                                                                                                                                                                             |
+| **`CODEOWNERS`**                              | Single `* @github/copilot-sdk`                                                  | Must add `java/ @github/copilot-sdk-java` line.                                                                                                                                                                                      |
+| **`lsp.json`**                                | Configures C# and Go language servers for Copilot agent                         | May want to add Java LSP (jdtls or similar) — **optional**.                                                                                                                                                                          |
 
 ### The Big Question: `reference-impl-sync`
 
@@ -224,6 +225,7 @@ Currently, the Java SDK has a scheduled workflow that polls `github/copilot-sdk`
 What changes is the **mechanism**: instead of polling a remote repository, the workflow watches for commits that land on `main` touching `dotnet/src/` or `nodejs/src/` and compares against `java/.lastmerge` (which now stores a monorepo commit SHA rather than a cross-repo one).
 
 **Recommendation**:
+
 1. **Keep `java/.lastmerge`** — it stores the last monorepo commit SHA whose `dotnet/`/`nodejs/` changes have been ported into Java. This is the anchor for diffing.
 2. **Keep `reference-impl-sync` as `java-reference-impl-sync.md`** — reworked for intra-repo operation (see §6 Phase 4 for details).
 3. **Keep `agentic-merge-reference-impl` skill** — reworked so that instead of cloning a remote repo, it reads diffs from the local `dotnet/` and `nodejs/` directories relative to the SHA in `java/.lastmerge`.
@@ -263,6 +265,7 @@ What changes is the **mechanism**: instead of polling a remote repository, the w
 3. Verify `mvn verify` works from `java/` directory locally.
 
 4. Add `justfile` targets for Java:
+
    ```just
    format-java:
        @echo "=== Formatting Java code ==="
@@ -291,7 +294,7 @@ What changes is the **mechanism**: instead of polling a remote repository, the w
    - Path triggers: `java/**`, `test/**`, `.github/workflows/java-sdk-tests.yml`
    - Uses monorepo's `setup-copilot` action (or create `java/setup-copilot` action)
    - Runs on 3 OS matrix (match other SDKs)
-   
+
 2. Merge Java into `codegen-check.yml`:
    - Add `java/src/generated/**` to path triggers
    - Add a job that runs Java codegen and diffs
@@ -407,39 +410,40 @@ What changes is the **mechanism**: instead of polling a remote repository, the w
 
 ### HIGH RISK
 
-| # | Risk | Impact | Mitigation |
-|---|---|---|---|
-| H1 | **Maven Central Trusted Publisher** repo-name mismatch | Cannot publish Java releases from monorepo | Verify/update Trusted Publisher config in Maven Central **before** migration. If the GAV is bound to `github/copilot-sdk-java`, it must be updated. |
-| H2 | **Unified `publish.yml` version collision** | All SDKs in monorepo share one version. Java has independent `X.Y.Z-java.N` versions. | Java must keep a **separate** publish workflow. Do NOT merge into `publish.yml`. |
-| H3 | **`agentic-merge-reference-impl` breaks** | The core Java development loop relies on this skill to stay in sync with .NET/Node changes | Must be carefully reworked for intra-repo operation before cutover. Test thoroughly with a dry-run on a feature branch. The skill + its 5 shell scripts + 2 prompt files all assume cross-repo cloning. |
-| H4 | **Secret provisioning delay** | Can't publish or run full CI until secrets are provisioned | Start secret provisioning **immediately** (Phase 0). |
-| H5 | **Test harness path changes** | Java E2E tests currently clone `copilot-sdk` at build time to get `test/harness/` and `test/snapshots/`. In-repo, these paths change. | Update `pom.xml` and test infrastructure to reference local `test/` directory instead of cloning. **This simplifies things significantly.** |
+| #   | Risk                                                   | Impact                                                                                                                                | Mitigation                                                                                                                                                                                              |
+| --- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1  | **Maven Central Trusted Publisher** repo-name mismatch | Cannot publish Java releases from monorepo                                                                                            | Verify/update Trusted Publisher config in Maven Central **before** migration. If the GAV is bound to `github/copilot-sdk-java`, it must be updated.                                                     |
+| H2  | **Unified `publish.yml` version collision**            | All SDKs in monorepo share one version. Java has independent `X.Y.Z-java.N` versions.                                                 | Java must keep a **separate** publish workflow. Do NOT merge into `publish.yml`.                                                                                                                        |
+| H3  | **`agentic-merge-reference-impl` breaks**              | The core Java development loop relies on this skill to stay in sync with .NET/Node changes                                            | Must be carefully reworked for intra-repo operation before cutover. Test thoroughly with a dry-run on a feature branch. The skill + its 5 shell scripts + 2 prompt files all assume cross-repo cloning. |
+| H4  | **Secret provisioning delay**                          | Can't publish or run full CI until secrets are provisioned                                                                            | Start secret provisioning **immediately** (Phase 0).                                                                                                                                                    |
+| H5  | **Test harness path changes**                          | Java E2E tests currently clone `copilot-sdk` at build time to get `test/harness/` and `test/snapshots/`. In-repo, these paths change. | Update `pom.xml` and test infrastructure to reference local `test/` directory instead of cloning. **This simplifies things significantly.**                                                             |
 
 ### MEDIUM RISK
 
-| # | Risk | Impact | Mitigation |
-|---|---|---|---|
-| M1 | **Codegen `package.json` merge** | Java codegen has its own `@github/copilot` dependency; monorepo codegen gets it from `nodejs/node_modules` | Align Java codegen to use the same dependency source. May need to add `generate:java` script to monorepo's `scripts/codegen/package.json`. |
-| M2 | **GitHub Pages conflict** | Java deploys versioned docs to Pages. Monorepo may have its own Pages setup. | Use subdirectory deployment or a separate Pages branch for Java. |
-| M3 | **Branch protection / required checks** | New `java-sdk-tests` check may not be in the required list | Add to branch protection after first successful run. |
-| M4 | **CODEOWNERS team permissions** | `@github/copilot-sdk-java` team may not have write access to `github/copilot-sdk` | Verify team access and add to repo collaborators. |
-| M5 | **`copilot-setup-steps.yml` bloat** | Adding JDK + Maven makes agent setup slower for non-Java tasks | Acceptable trade-off; other languages already add their tools. Could consider conditional setup but that's over-engineering. |
-| M6 | **gh-aw version mismatch** | Java repo uses gh-aw `v0.68.3` setup action pinned at `v0.71.5`; monorepo uses `v0.64.2` reference in docs | Align gh-aw versions. Use the newer version. Recompile all `.lock.yml` files. |
+| #   | Risk                                    | Impact                                                                                                     | Mitigation                                                                                                                                 |
+| --- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| M1  | **Codegen `package.json` merge**        | Java codegen has its own `@github/copilot` dependency; monorepo codegen gets it from `nodejs/node_modules` | Align Java codegen to use the same dependency source. May need to add `generate:java` script to monorepo's `scripts/codegen/package.json`. |
+| M2  | **GitHub Pages conflict**               | Java deploys versioned docs to Pages. Monorepo may have its own Pages setup.                               | Use subdirectory deployment or a separate Pages branch for Java.                                                                           |
+| M3  | **Branch protection / required checks** | New `java-sdk-tests` check may not be in the required list                                                 | Add to branch protection after first successful run.                                                                                       |
+| M4  | **CODEOWNERS team permissions**         | `@github/copilot-sdk-java` team may not have write access to `github/copilot-sdk`                          | Verify team access and add to repo collaborators.                                                                                          |
+| M5  | **`copilot-setup-steps.yml` bloat**     | Adding JDK + Maven makes agent setup slower for non-Java tasks                                             | Acceptable trade-off; other languages already add their tools. Could consider conditional setup but that's over-engineering.               |
+| M6  | **gh-aw version mismatch**              | Java repo uses gh-aw `v0.68.3` setup action pinned at `v0.71.5`; monorepo uses `v0.64.2` reference in docs | Align gh-aw versions. Use the newer version. Recompile all `.lock.yml` files.                                                              |
 
 ### LOW RISK
 
-| # | Risk | Impact | Mitigation |
-|---|---|---|---|
-| L1 | **Issue template conflicts** | Java has custom issue templates; monorepo uses agentic triage | Monorepo agentic triage covers this. Can add Java-specific labels. |
-| L2 | **PR template differences** | Different PR templates | Use monorepo's template. Java-specific guidance in CONTRIBUTING.md. |
-| L3 | **`.githooks` scope** | Java pre-commit hook runs `mvn spotless:check` globally | Scope hook to only run when Java files are changed. |
-| L4 | **Duplicate `agentics-maintenance.yml`** | Java repo has its own; monorepo will generate one | The monorepo's gh-aw will handle this automatically. Don't migrate. |
+| #   | Risk                                     | Impact                                                        | Mitigation                                                          |
+| --- | ---------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------- |
+| L1  | **Issue template conflicts**             | Java has custom issue templates; monorepo uses agentic triage | Monorepo agentic triage covers this. Can add Java-specific labels.  |
+| L2  | **PR template differences**              | Different PR templates                                        | Use monorepo's template. Java-specific guidance in CONTRIBUTING.md. |
+| L3  | **`.githooks` scope**                    | Java pre-commit hook runs `mvn spotless:check` globally       | Scope hook to only run when Java files are changed.                 |
+| L4  | **Duplicate `agentics-maintenance.yml`** | Java repo has its own; monorepo will generate one             | The monorepo's gh-aw will handle this automatically. Don't migrate. |
 
 ---
 
 ## 8. Post-Migration Verification Checklist
 
 ### CI/CD
+
 - [ ] `java-sdk-tests.yml` passes on all 3 OS platforms
 - [ ] `codegen-check.yml` includes Java and passes
 - [ ] `java-codegen-fix.md` compiles and agentic workflow functions
@@ -449,6 +453,7 @@ What changes is the **mechanism**: instead of polling a remote repository, the w
 - [ ] `java-deploy-site.yml` successfully deploys docs
 
 ### Integration
+
 - [ ] `copilot-setup-steps.yml` includes JDK and Maven
 - [ ] `dependabot.yaml` includes Maven ecosystem for `java/`
 - [ ] `CODEOWNERS` includes `java/` path
@@ -457,24 +462,28 @@ What changes is the **mechanism**: instead of polling a remote repository, the w
 - [ ] `issue-triage` knows about `sdk/java` label
 
 ### Code
+
 - [ ] `mvn verify` passes from `java/` directory
 - [ ] E2E tests use local `test/harness/` and `test/snapshots/` (no cloning)
 - [ ] Java codegen integrated into `scripts/codegen/`
 - [ ] `.lastmerge` exists at `java/.lastmerge`
 
 ### Documentation
+
 - [ ] Monorepo `README.md` lists Java
 - [ ] `copilot-instructions.md` includes Java guidance
 - [ ] `java/README.md` links updated to monorepo
 - [ ] Maven Central POM `<scm>` URLs updated
 
 ### Agentic Sync
+
 - [ ] `java-reference-impl-sync.md` compiles and detects new dotnet/nodejs changes via local `git log`
 - [ ] `agentic-merge-reference-impl` skill works intra-repo (no cross-repo clone)
 - [ ] `java/.lastmerge` correctly stores monorepo commit SHAs
 - [ ] Sync scripts in `.github/scripts/java/reference-impl-sync/` use local paths
 
 ### Cleanup
+
 - [ ] `copilot-sdk-java` repo archived
 - [ ] No broken links to old repo
 - [ ] No duplicate `agentics-maintenance.yml`
@@ -483,62 +492,62 @@ What changes is the **mechanism**: instead of polling a remote repository, the w
 
 ## Appendix A: Files to Copy vs. Merge vs. Delete
 
-| Source File (copilot-sdk-java-00) | Action | Target Location (copilot-sdk-00) |
-|---|---|---|
-| `src/` | Copy | `java/src/` |
-| `config/` | Copy | `java/config/` |
-| `pom.xml` | Copy + update paths | `java/pom.xml` |
-| `CHANGELOG.md` | Copy | `java/CHANGELOG.md` |
-| `README.md` | Copy + update links | `java/README.md` |
-| `jbang-example.java` | Copy | `java/jbang-example.java` |
-| `.lastmerge` | Copy | `java/.lastmerge` |
-| `.githooks/pre-commit` | Copy + scope to Java changes | `java/.githooks/pre-commit` |
-| `docs/adr/` | Copy | `java/docs/adr/` |
-| `scripts/codegen/java.ts` | Copy | `scripts/codegen/java.ts` |
-| `scripts/codegen/package.json` | **Merge** deps into monorepo's | `scripts/codegen/package.json` |
-| `.github/workflows/build-test.yml` | **Adapt** → rename | `.github/workflows/java-sdk-tests.yml` |
-| `.github/workflows/publish-maven.yml` | **Adapt** → rename | `.github/workflows/java-publish.yml` |
-| `.github/workflows/publish-snapshot.yml` | **Adapt** → rename | `.github/workflows/java-publish-snapshot.yml` |
-| `.github/workflows/deploy-site.yml` | **Adapt** → rename | `.github/workflows/java-deploy-site.yml` |
-| `.github/workflows/run-smoke-test.yml` | **Adapt** → rename | `.github/workflows/java-smoke-test.yml` |
-| `.github/workflows/codegen-check.yml` | **Merge** into existing | `.github/workflows/codegen-check.yml` |
-| `.github/workflows/codegen-agentic-fix.md` | **Adapt** → rename | `.github/workflows/java-codegen-fix.md` |
-| `.github/workflows/update-copilot-dependency.yml` | **Merge** into existing | `.github/workflows/update-copilot-dependency.yml` |
-| `.github/workflows/copilot-setup-steps.yml` | **Merge** into existing | `.github/workflows/copilot-setup-steps.yml` |
-| `.github/workflows/reference-impl-sync.md` + `.lock.yml` | **Adapt** → rename + rework for intra-repo | `.github/workflows/java-reference-impl-sync.md` + `.lock.yml` |
-| `.github/workflows/agentics-maintenance.yml` | **DELETE** (monorepo has its own) | — |
-| `.github/workflows/notes.template` | Copy | `.github/workflows/java-notes.template` |
-| `.github/actions/setup-copilot/` | **Adapt** or merge | `.github/actions/java-setup-copilot/` or merge |
-| `.github/actions/test-report/` | Copy | `.github/actions/java-test-report/` |
-| `.github/scripts/*` | Copy + update paths | `.github/scripts/java/` (new subdirectory) |
-| `.github/skills/agentic-merge-reference-impl/` | **Rework** for intra-repo (remove cross-repo clone, use local git diff) | `.github/skills/java-merge-reference-impl/` |
-| `.github/skills/commit-as-pull-request/` | Check for duplicates | `.github/skills/commit-as-pull-request/` |
-| `.github/skills/documentation-coverage/` | Copy | `.github/skills/java-documentation-coverage/` |
-| `.github/prompts/*` | Copy + update | `.github/prompts/` (prefix with `java-` if needed) |
-| `.github/dependabot.yml` | **Merge** into existing | `.github/dependabot.yaml` |
-| `.github/CODEOWNERS` | **Merge** into existing | `.github/CODEOWNERS` |
-| `.github/copilot-instructions.md` | **Merge** into existing | `.github/copilot-instructions.md` |
-| `.github/release.yml` | **Merge** into existing | `.github/release.yml` (if it exists) |
-| `.github/ISSUE_TEMPLATE/*` | Evaluate — likely skip | — |
-| `.github/pull_request_template.md` | Evaluate — likely skip | — |
-| `.github/templates/` | Copy | `java/.github/templates/` or `java/src/site/` |
-| `instructions/` | Move | `java/instructions/` |
-| `test` (file, not directory) | Copy if needed | `java/test` |
+| Source File (copilot-sdk-java-00)                        | Action                                                                  | Target Location (copilot-sdk-00)                              |
+| -------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `src/`                                                   | Copy                                                                    | `java/src/`                                                   |
+| `config/`                                                | Copy                                                                    | `java/config/`                                                |
+| `pom.xml`                                                | Copy + update paths                                                     | `java/pom.xml`                                                |
+| `CHANGELOG.md`                                           | Copy                                                                    | `java/CHANGELOG.md`                                           |
+| `README.md`                                              | Copy + update links                                                     | `java/README.md`                                              |
+| `jbang-example.java`                                     | Copy                                                                    | `java/jbang-example.java`                                     |
+| `.lastmerge`                                             | Copy                                                                    | `java/.lastmerge`                                             |
+| `.githooks/pre-commit`                                   | Copy + scope to Java changes                                            | `java/.githooks/pre-commit`                                   |
+| `docs/adr/`                                              | Copy                                                                    | `java/docs/adr/`                                              |
+| `scripts/codegen/java.ts`                                | Copy                                                                    | `java/scripts/codegen/java.ts`                                |
+| `scripts/codegen/package.json`                           | Copy (Java keeps its own)                                               | `java/scripts/codegen/package.json`                           |
+| `.github/workflows/build-test.yml`                       | **Adapt** → rename                                                      | `.github/workflows/java-sdk-tests.yml`                        |
+| `.github/workflows/publish-maven.yml`                    | **Adapt** → rename                                                      | `.github/workflows/java-publish.yml`                          |
+| `.github/workflows/publish-snapshot.yml`                 | **Adapt** → rename                                                      | `.github/workflows/java-publish-snapshot.yml`                 |
+| `.github/workflows/deploy-site.yml`                      | **Adapt** → rename                                                      | `.github/workflows/java-deploy-site.yml`                      |
+| `.github/workflows/run-smoke-test.yml`                   | **Adapt** → rename                                                      | `.github/workflows/java-smoke-test.yml`                       |
+| `.github/workflows/codegen-check.yml`                    | **Merge** into existing                                                 | `.github/workflows/codegen-check.yml`                         |
+| `.github/workflows/codegen-agentic-fix.md`               | **Adapt** → rename                                                      | `.github/workflows/java-codegen-fix.md`                       |
+| `.github/workflows/update-copilot-dependency.yml`        | **Merge** into existing                                                 | `.github/workflows/update-copilot-dependency.yml`             |
+| `.github/workflows/copilot-setup-steps.yml`              | **Merge** into existing                                                 | `.github/workflows/copilot-setup-steps.yml`                   |
+| `.github/workflows/reference-impl-sync.md` + `.lock.yml` | **Adapt** → rename + rework for intra-repo                              | `.github/workflows/java-reference-impl-sync.md` + `.lock.yml` |
+| `.github/workflows/agentics-maintenance.yml`             | **DELETE** (monorepo has its own)                                       | —                                                             |
+| `.github/workflows/notes.template`                       | Copy                                                                    | `.github/workflows/java-notes.template`                       |
+| `.github/actions/setup-copilot/`                         | **Adapt** or merge                                                      | `.github/actions/java-setup-copilot/` or merge                |
+| `.github/actions/test-report/`                           | Copy                                                                    | `.github/actions/java-test-report/`                           |
+| `.github/scripts/*`                                      | Copy + update paths                                                     | `.github/scripts/java/` (new subdirectory)                    |
+| `.github/skills/agentic-merge-reference-impl/`           | **Rework** for intra-repo (remove cross-repo clone, use local git diff) | `.github/skills/java-merge-reference-impl/`                   |
+| `.github/skills/commit-as-pull-request/`                 | Check for duplicates                                                    | `.github/skills/commit-as-pull-request/`                      |
+| `.github/skills/documentation-coverage/`                 | Copy                                                                    | `.github/skills/java-documentation-coverage/`                 |
+| `.github/prompts/*`                                      | Copy + update                                                           | `.github/prompts/` (prefix with `java-` if needed)            |
+| `.github/dependabot.yml`                                 | **Merge** into existing                                                 | `.github/dependabot.yaml`                                     |
+| `.github/CODEOWNERS`                                     | **Merge** into existing                                                 | `.github/CODEOWNERS`                                          |
+| `.github/copilot-instructions.md`                        | **Merge** into existing                                                 | `.github/copilot-instructions.md`                             |
+| `.github/release.yml`                                    | **Merge** into existing                                                 | `.github/release.yml` (if it exists)                          |
+| `.github/ISSUE_TEMPLATE/*`                               | Evaluate — likely skip                                                  | —                                                             |
+| `.github/pull_request_template.md`                       | Evaluate — likely skip                                                  | —                                                             |
+| `.github/templates/`                                     | Copy                                                                    | `java/.github/templates/` or `java/src/site/`                 |
+| `instructions/`                                          | Move                                                                    | `java/instructions/`                                          |
+| `test` (file, not directory)                             | Copy if needed                                                          | `java/test`                                                   |
 
 ## Appendix B: Unique Java Concerns vs Other Languages
 
-| Concern | Java | Other Languages | Notes |
-|---|---|---|---|
-| **Build system** | Maven (`pom.xml`) | npm, pip, go mod, dotnet, cargo | Fully self-contained under `java/` |
-| **Versioning** | `X.Y.Z-java.N` (independent) | Shared `X.Y.Z` across all others | **Must keep separate publish workflow** |
-| **Code formatting** | Spotless (Eclipse formatter) | prettier, ruff, gofmt, dotnet format, rustfmt | Runs only on Java files |
-| **Test framework** | JUnit + Surefire | Vitest, pytest, go test, xunit, cargo test | Standard; no conflicts |
-| **E2E test harness** | Clones `copilot-sdk` at build time | References local `test/harness/` | **Major simplification** when in-repo |
-| **Codegen** | Own `java.ts` + own `@github/copilot` dep | Shared codegen scripts + shared dep | Needs reconciliation |
-| **CI runner** | JDK 17 + JDK 25 (smoke test) | Node 22, Python 3.12, Go 1.24, .NET 10, Rust 1.94 | Just another tool in `copilot-setup-steps.yml` |
-| **Publishing** | Maven Central (GPG + Sonatype) | npm, PyPI, NuGet, crates.io, Go tags | Completely different mechanism |
-| **Docs hosting** | GitHub Pages (Maven site) | Not clear if monorepo has its own | Potential conflict |
-| **Reference impl tracking** | `.lastmerge` + scheduled sync + agentic merge skill | N/A (they ARE the reference impl) | `.lastmerge` stores monorepo SHA; sync becomes intra-repo but is still needed because Java maintainers ≠ .NET/Node maintainers |
+| Concern                     | Java                                                | Other Languages                                   | Notes                                                                                                                          |
+| --------------------------- | --------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Build system**            | Maven (`pom.xml`)                                   | npm, pip, go mod, dotnet, cargo                   | Fully self-contained under `java/`                                                                                             |
+| **Versioning**              | `X.Y.Z-java.N` (independent)                        | Shared `X.Y.Z` across all others                  | **Must keep separate publish workflow**                                                                                        |
+| **Code formatting**         | Spotless (Eclipse formatter)                        | prettier, ruff, gofmt, dotnet format, rustfmt     | Runs only on Java files                                                                                                        |
+| **Test framework**          | JUnit + Surefire                                    | Vitest, pytest, go test, xunit, cargo test        | Standard; no conflicts                                                                                                         |
+| **E2E test harness**        | Clones `copilot-sdk` at build time                  | References local `test/harness/`                  | **Major simplification** when in-repo                                                                                          |
+| **Codegen**                 | Own `java.ts` + own `@github/copilot` dep           | Shared codegen scripts + shared dep               | Needs reconciliation                                                                                                           |
+| **CI runner**               | JDK 17 + JDK 25 (smoke test)                        | Node 22, Python 3.12, Go 1.24, .NET 10, Rust 1.94 | Just another tool in `copilot-setup-steps.yml`                                                                                 |
+| **Publishing**              | Maven Central (GPG + Sonatype)                      | npm, PyPI, NuGet, crates.io, Go tags              | Completely different mechanism                                                                                                 |
+| **Docs hosting**            | GitHub Pages (Maven site)                           | Not clear if monorepo has its own                 | Potential conflict                                                                                                             |
+| **Reference impl tracking** | `.lastmerge` + scheduled sync + agentic merge skill | N/A (they ARE the reference impl)                 | `.lastmerge` stores monorepo SHA; sync becomes intra-repo but is still needed because Java maintainers ≠ .NET/Node maintainers |
 
 ---
 
@@ -582,11 +591,13 @@ Additionally, the monorepo's top-level README contains Quick Start code for **ot
 #### 1. Update `PROMPT-smoke-test.md` — change the README path
 
 Replace:
+
 ```
 Read the file `README.md` at the top level of this repository.
 ```
 
 With:
+
 ```
 Read the file `java/README.md` in this repository.
 ```
@@ -614,23 +625,25 @@ The workflow steps that run `mvn` and reference `src/test/prompts/PROMPT-smoke-t
 #### 4. Update `build-test.yml` → `java-sdk-tests.yml` — smoke test call
 
 The current `build-test.yml` calls:
+
 ```yaml
 uses: ./.github/workflows/run-smoke-test.yml
 ```
 
 After rename, update to:
+
 ```yaml
 uses: ./.github/workflows/java-smoke-test.yml
 ```
 
 ### Risk Assessment
 
-| Risk | Severity | Notes |
-|---|---|---|
-| Prompt reads wrong README | **HIGH** | If `PROMPT-smoke-test.md` still says "top level README," the AI agent reads the monorepo README and fails or extracts wrong-language code |
-| `java/README.md` placeholder overwrites real content | **HIGH** | The monorepo already has a `java/README.md` with a different Quick Start. Must be replaced with the full Java SDK README during migration |
-| `smoke-test/` directory created at wrong location | **MEDIUM** | Without `working-directory: ./java`, the smoke test project gets created at the monorepo root instead of under `java/` |
-| `// JDK 25+:` comments missing from Quick Start | **MEDIUM** | The JDK 25 smoke test job relies on these comments to toggle virtual thread support. Missing comments → JDK 25 job builds without virtual threads and still passes (silent regression, not a failure) |
+| Risk                                                 | Severity   | Notes                                                                                                                                                                                                 |
+| ---------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prompt reads wrong README                            | **HIGH**   | If `PROMPT-smoke-test.md` still says "top level README," the AI agent reads the monorepo README and fails or extracts wrong-language code                                                             |
+| `java/README.md` placeholder overwrites real content | **HIGH**   | The monorepo already has a `java/README.md` with a different Quick Start. Must be replaced with the full Java SDK README during migration                                                             |
+| `smoke-test/` directory created at wrong location    | **MEDIUM** | Without `working-directory: ./java`, the smoke test project gets created at the monorepo root instead of under `java/`                                                                                |
+| `// JDK 25+:` comments missing from Quick Start      | **MEDIUM** | The JDK 25 smoke test job relies on these comments to toggle virtual thread support. Missing comments → JDK 25 job builds without virtual threads and still passes (silent regression, not a failure) |
 
 ### Verification Checklist
 
