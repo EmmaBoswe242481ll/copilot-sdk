@@ -6,23 +6,23 @@
 2. [Permissions and Secrets Challenges](#2-permissions-and-secrets-challenges)
 3. [Naming Convention Proposal](#3-naming-convention-proposal)
 4. [Current Language Separation Assessment](#4-current-language-separation-assessment)5. [Workflow Inventory Tables](#5-workflow-inventory-tables)
-6. [Agents, Skills, Prompts, and Supporting Resources Inventory](#6-agents-skills-prompts-and-supporting-resources-inventory)
-7. [Pitfalls and Risk Register](#7-pitfalls-and-risk-register)
-8. [Post-Migration Verification Checklist](#8-post-migration-verification-checklist)
+5. [Agents, Skills, Prompts, and Supporting Resources Inventory](#6-agents-skills-prompts-and-supporting-resources-inventory)
+6. [Pitfalls and Risk Register](#7-pitfalls-and-risk-register)
+7. [Post-Migration Verification Checklist](#8-post-migration-verification-checklist)
 
 - [Appendix A: Files to Copy vs. Merge vs. Delete](#appendix-a-files-to-copy-vs-merge-vs-delete)
 - [Appendix B: Unique Java Concerns vs Other Languages](#appendix-b-unique-java-concerns-vs-other-languages)
 - [Appendix C: Java Smoketest](#appendix-c-java-smoketest)
 
---- 
+---
 
 ## 1. Migration Plan — Phases
 
 ### Phase 0: Pre-Flight (Before Writing Any Code)
 
 - [✅] **Provision secrets** in `github/copilot-sdk` (see §2A) See https://github.com/github/copilot-sdk-partners/issues/90
-- [⌛] **Verify CODEOWNERS team** access. See https://github.com/github/copilot-sdk-partners/issues/89 
-- [⌛] **Check Maven Central Trusted Publisher** — can `github/copilot-sdk` publish to `com.github:copilot-sdk-java`? See 
+- [✅] **Verify CODEOWNERS team** access. See https://github.com/github/copilot-sdk-partners/issues/89
+- [⌛] **Check Maven Central Trusted Publisher** — can `github/copilot-sdk` publish to `com.github:copilot-sdk-java`? See
 - [⌛] **Check GitHub Pages** — is it enabled? Can Java docs coexist? See https://github.com/github/copilot-sdk-partners/issues/85
 - [ ] **Confirm branch protection** — will new required status checks be accepted?
 - [ ] **Create tracking issue** in `github/copilot-sdk` for this migration
@@ -94,7 +94,7 @@
    - Add Maven ecosystem entry for `/java`
 
 6. Update `CODEOWNERS`:
-   - Add `java/ @github/copilot-sdk-java`
+   - ~~Add `java/ @github/copilot-sdk-java`~~
 
 ### Phase 3: Publish Workflows
 
@@ -195,14 +195,14 @@
 
 The Java SDK publish workflow requires secrets that **do not currently exist** in the `copilot-sdk` repo:
 
-| Old Secret               | Old Used By                                      | New Secret | New Used By | Notes                                               |
-| ------------------------ | ------------------------------------------------ | -----------|-------------|---------------------------------------------------- |
-| `RELEASE_TOKEN`          | `publish-maven.yml`                              | `JAVA_RELEASE_TOKEN` | `java-publish-maven.yml` | PAT with `contents:write` for pushing tags/commits during maven-release-plugin |
-| `GPG_SECRET_KEY`         | `publish-maven.yml`                              | `JAVA_GPG_SECRET_KEY` | `java-publish-maven.yml` | GPG private key for signing Maven artifacts                                    |
-| `GPG_PASSPHRASE`         | `publish-maven.yml`                              | `JAVA_GPG_PASSPHRASE` | `java-publish-maven.yml` | Passphrase for the GPG key                                                     |
-| `MAVEN_CENTRAL_USERNAME` | `publish-maven.yml`, `publish-snapshot.yml`      | `JAVA_MAVEN_CENTRAL_USERNAME` | `java-publish-maven.yml`, `java-publish-snapshot.yml`  | Sonatype/Maven Central credentials                                             |
+| Old Secret               | Old Used By                                      | New Secret                    | New Used By                                           | Notes                                                                          |
+| ------------------------ | ------------------------------------------------ | ----------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `RELEASE_TOKEN`          | `publish-maven.yml`                              | `JAVA_RELEASE_TOKEN`          | `java-publish-maven.yml`                              | PAT with `contents:write` for pushing tags/commits during maven-release-plugin |
+| `GPG_SECRET_KEY`         | `publish-maven.yml`                              | `JAVA_GPG_SECRET_KEY`         | `java-publish-maven.yml`                              | GPG private key for signing Maven artifacts                                    |
+| `GPG_PASSPHRASE`         | `publish-maven.yml`                              | `JAVA_GPG_PASSPHRASE`         | `java-publish-maven.yml`                              | Passphrase for the GPG key                                                     |
+| `MAVEN_CENTRAL_USERNAME` | `publish-maven.yml`, `publish-snapshot.yml`      | `JAVA_MAVEN_CENTRAL_USERNAME` | `java-publish-maven.yml`, `java-publish-snapshot.yml` | Sonatype/Maven Central credentials                                             |
 | `MAVEN_CENTRAL_PASSWORD` | `publish-maven.yml`, `publish-snapshot.yml`      | `JAVA_MAVEN_CENTRAL_PASSWORD` | `java-publish-maven.yml`, `java-publish-snapshot.yml` | Sonatype/Maven Central credentials                                             |
-| `COPILOT_GITHUB_TOKEN`   | `build-test.yml`, `codegen-agentic-fix.lock.yml` | unchanged | | Token for Copilot CLI in CI                                                    |
+| `COPILOT_GITHUB_TOKEN`   | `build-test.yml`, `codegen-agentic-fix.lock.yml` | unchanged                     |                                                       | Token for Copilot CLI in CI                                                    |
 
 ### 2B. Existing Secrets in copilot-sdk That May Conflict
 
@@ -214,7 +214,7 @@ The Java SDK publish workflow requires secrets that **do not currently exist** i
 ### 2C. Permissions / Access to Provision
 
 - [✅] **Repository secrets**: File a ticket to add the 6 Java-specific secrets to `github/copilot-sdk`. See https://github.com/github/copilot-sdk-partners/issues/90
-- [⌛] **CODEOWNERS team**: Ensure `@github/copilot-sdk-java` team has access to `github/copilot-sdk` and is added to CODEOWNERS for `java/**`. See https://github.com/github/copilot-sdk-partners/issues/89 .
+- [✅] **CODEOWNERS team**: ~~Ensure `@github/copilot-sdk-java` team has access to `github/copilot-sdk` and is added to CODEOWNERS for `java/**`.~~ See https://github.com/github/copilot-sdk-partners/issues/89 .
 - [⌛] **Maven Central Trusted Publisher**: Currently configured for `github/copilot-sdk-java`. Must be updated to also allow publishing from `github/copilot-sdk` (or create a new namespace mapping). **This is the highest-risk permission issue** — Maven Central's Trusted Publisher setup ties the repository name to the publish flow. See https://github.com/github/copilot-sdk-partners/issues/91
 - [⌛] **GitHub Pages**: If `deploy-site.yml` moves, check if GitHub Pages is enabled on the monorepo and whether Java docs can coexist with any existing docs deployment. See https://github.com/github/copilot-sdk-partners/issues/85
 - [ ] **Branch protection**: Ensure `main` branch protection rules in copilot-sdk permit the Java CI workflows (merge queues, required status checks, etc.).
@@ -295,7 +295,7 @@ Keep existing names: `publish.yml`, `codegen-check.yml`, `scenario-builds.yml`, 
 | **`sdk-consistency-review`** agentic workflow | Reviews PRs for cross-SDK parity (currently watches nodejs, python, go, dotnet) | Must add `java/` to the path triggers and update the agent prompt to include Java.                                                                                                                                                   |
 | **`copilot-setup-steps.yml`**                 | Sets up Node, Python, Go, .NET, Rust                                            | Must add JDK 17 + Maven.                                                                                                                                                                                                             |
 | **`copilot-instructions.md`**                 | Monorepo-wide instructions                                                      | Must incorporate Java-specific guidance.                                                                                                                                                                                             |
-| **`CODEOWNERS`**                              | Single `* @github/copilot-sdk`                                                  | Must add `java/ @github/copilot-sdk-java` line.                                                                                                                                                                                      |
+| **`CODEOWNERS`**                              | Single `* @github/copilot-sdk`                                                  | ~~Must add `java/ @github/copilot-sdk-java` line.~~                                                                                                                                                                                  |
 | **`lsp.json`**                                | Configures C# and Go language servers for Copilot agent                         | May want to add Java LSP (jdtls or similar) — **optional**.                                                                                                                                                                          |
 
 ### The Big Question: `reference-impl-sync`
