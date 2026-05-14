@@ -126,17 +126,9 @@ export type UserMessageAttachmentGithubReferenceType = "issue" | "pr" | "discuss
  */
 export type AssistantMessageToolRequestType = "function" | "custom";
 /**
- * API endpoint used for this model call, matching CAPI supported_endpoints vocabulary
- */
-export type AssistantUsageApiEndpoint = "/chat/completions" | "/v1/messages" | "/responses" | "ws:/responses";
-/**
  * Where the failed model call originated
  */
 export type ModelCallFailureSource = "top_level" | "subagent" | "mcp_sampling";
-/**
- * Finite reason code describing why the current turn was aborted
- */
-export type AbortReason = "user_initiated" | "remote_command" | "user_abort";
 /**
  * A content block within a tool result, which may be text, terminal output, image, audio, or a resource
  */
@@ -184,9 +176,7 @@ export type PermissionRequest =
   | PermissionRequestUrl
   | PermissionRequestMemory
   | PermissionRequestCustomTool
-  | PermissionRequestHook
-  | PermissionRequestExtensionManagement
-  | PermissionRequestExtensionPermissionAccess;
+  | PermissionRequestHook;
 /**
  * Whether this is a store or vote memory operation
  */
@@ -207,9 +197,7 @@ export type PermissionPromptRequest =
   | PermissionPromptRequestMemory
   | PermissionPromptRequestCustomTool
   | PermissionPromptRequestPath
-  | PermissionPromptRequestHook
-  | PermissionPromptRequestExtensionManagement
-  | PermissionPromptRequestExtensionPermissionAccess;
+  | PermissionPromptRequestHook;
 /**
  * Whether this is a store or vote memory operation
  */
@@ -244,9 +232,7 @@ export type UserToolSessionApproval =
   | UserToolSessionApprovalWrite
   | UserToolSessionApprovalMcp
   | UserToolSessionApprovalMemory
-  | UserToolSessionApprovalCustomTool
-  | UserToolSessionApprovalExtensionManagement
-  | UserToolSessionApprovalExtensionPermissionAccess;
+  | UserToolSessionApprovalCustomTool;
 /**
  * Elicitation mode; "form" for structured input, "url" for browser-based. Defaults to "form" when absent.
  */
@@ -322,10 +308,6 @@ export interface StartData {
    * Version string of the Copilot application
    */
   copilotVersion: string;
-  /**
-   * When set, identifies a parent session whose context this session continues — e.g., a detached headless rem-agent run launched on the parent's interactive shutdown. Telemetry from this session is reported under the parent's session_id.
-   */
-  detachedFromSpawningParentSessionId?: string;
   /**
    * Identifier of the software producing the events (e.g., "copilot-agent")
    */
@@ -630,7 +612,7 @@ export interface ScheduleCreatedEvent {
   type: "session.schedule_created";
 }
 /**
- * Scheduled prompt registered via /every or /after
+ * Scheduled prompt registered via /every
  */
 export interface ScheduleCreatedData {
   /**
@@ -645,10 +627,6 @@ export interface ScheduleCreatedData {
    * Prompt text that gets enqueued on every tick
    */
   prompt: string;
-  /**
-   * Whether the schedule re-arms after each tick (`/every`) or fires once (`/after`)
-   */
-  recurring?: boolean;
 }
 export interface ScheduleCancelledEvent {
   /**
@@ -1591,10 +1569,6 @@ export interface UserMessageData {
    */
   interactionId?: string;
   /**
-   * True when this user message was auto-injected by autopilot's continuation loop rather than typed by the user; used to distinguish autopilot-driven turns in telemetry.
-   */
-  isAutopilotContinuation?: boolean;
-  /**
    * Path-backed native document attachments that stayed on the tagged_files path flow because native upload would exceed the request size limit
    */
   nativeDocumentPathFallbackPaths?: string[];
@@ -1987,14 +1961,6 @@ export interface AssistantMessageEvent {
  */
 export interface AssistantMessageData {
   /**
-   * Raw Anthropic content array with advisor blocks (server_tool_use, advisor_tool_result) for verbatim round-tripping
-   */
-  anthropicAdvisorBlocks?: unknown[];
-  /**
-   * Anthropic advisor model ID used for this response, for timeline display on replay
-   */
-  anthropicAdvisorModel?: string;
-  /**
    * The assistant's text response content
    */
   content: string;
@@ -2010,10 +1976,6 @@ export interface AssistantMessageData {
    * Unique identifier for this assistant message
    */
   messageId: string;
-  /**
-   * Model that produced this assistant message, if known
-   */
-  model?: string;
   /**
    * Actual output token count from the API response (completion_tokens), used for accurate token accounting
    */
@@ -2219,7 +2181,6 @@ export interface AssistantUsageData {
    * Completion ID from the model provider (e.g., chatcmpl-abc123)
    */
   apiCallId?: string;
-  apiEndpoint?: AssistantUsageApiEndpoint;
   /**
    * Number of tokens read from prompt cache
    */
@@ -2436,7 +2397,10 @@ export interface AbortEvent {
  * Turn abort information including the reason for termination
  */
 export interface AbortData {
-  reason: AbortReason;
+  /**
+   * Reason the current turn was aborted (e.g., "user initiated")
+   */
+  reason: string;
 }
 export interface ToolUserRequestedEvent {
   /**
@@ -2963,10 +2927,6 @@ export interface SubagentStartedData {
    * Internal name of the sub-agent
    */
   agentName: string;
-  /**
-   * Model the sub-agent will run with, when known at start. Surfaced in the timeline for auto-selected sub-agents (e.g. rubber-duck).
-   */
-  model?: string;
   /**
    * Tool call ID of the parent tool invocation that spawned this sub-agent
    */
@@ -3746,48 +3706,6 @@ export interface PermissionRequestHook {
   toolName: string;
 }
 /**
- * Extension management permission request
- */
-export interface PermissionRequestExtensionManagement {
-  /**
-   * Name of the extension being managed
-   */
-  extensionName?: string;
-  /**
-   * Permission kind discriminator
-   */
-  kind: "extension-management";
-  /**
-   * The extension management operation (scaffold, reload)
-   */
-  operation: string;
-  /**
-   * Tool call ID that triggered this permission request
-   */
-  toolCallId?: string;
-}
-/**
- * Extension permission access request
- */
-export interface PermissionRequestExtensionPermissionAccess {
-  /**
-   * Capabilities the extension is requesting
-   */
-  capabilities: string[];
-  /**
-   * Name of the extension requesting permission access
-   */
-  extensionName: string;
-  /**
-   * Permission kind discriminator
-   */
-  kind: "extension-permission-access";
-  /**
-   * Tool call ID that triggered this permission request
-   */
-  toolCallId?: string;
-}
-/**
  * Shell command permission prompt
  */
 export interface PermissionPromptRequestCommands {
@@ -4024,48 +3942,6 @@ export interface PermissionPromptRequestHook {
    */
   toolName: string;
 }
-/**
- * Extension management permission prompt
- */
-export interface PermissionPromptRequestExtensionManagement {
-  /**
-   * Name of the extension being managed
-   */
-  extensionName?: string;
-  /**
-   * Prompt kind discriminator
-   */
-  kind: "extension-management";
-  /**
-   * The extension management operation (scaffold, reload)
-   */
-  operation: string;
-  /**
-   * Tool call ID that triggered this permission request
-   */
-  toolCallId?: string;
-}
-/**
- * Extension permission access prompt
- */
-export interface PermissionPromptRequestExtensionPermissionAccess {
-  /**
-   * Capabilities the extension is requesting
-   */
-  capabilities: string[];
-  /**
-   * Name of the extension requesting permission access
-   */
-  extensionName: string;
-  /**
-   * Prompt kind discriminator
-   */
-  kind: "extension-permission-access";
-  /**
-   * Tool call ID that triggered this permission request
-   */
-  toolCallId?: string;
-}
 export interface PermissionCompletedEvent {
   /**
    * Sub-agent instance identifier. Absent for events from the root/main agent and session-level events.
@@ -4168,26 +4044,6 @@ export interface UserToolSessionApprovalCustomTool {
    * Custom tool name
    */
   toolName: string;
-}
-export interface UserToolSessionApprovalExtensionManagement {
-  /**
-   * Extension management approval kind
-   */
-  kind: "extension-management";
-  /**
-   * Optional operation identifier
-   */
-  operation?: string;
-}
-export interface UserToolSessionApprovalExtensionPermissionAccess {
-  /**
-   * Extension name
-   */
-  extensionName: string;
-  /**
-   * Extension permission access approval kind
-   */
-  kind: "extension-permission-access";
 }
 export interface PermissionApprovedForLocation {
   approval: UserToolSessionApproval;

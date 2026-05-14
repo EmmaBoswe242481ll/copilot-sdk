@@ -1867,6 +1867,14 @@ class SessionFSSetProviderResult:
         result["success"] = from_bool(self.success)
         return result
 
+class SessionFSSqliteQueryType(Enum):
+    """How to execute the query: 'exec' for DDL/multi-statement (no results), 'query' for SELECT
+    (returns rows), 'run' for INSERT/UPDATE/DELETE (returns rowsAffected)
+    """
+    EXEC = "exec"
+    QUERY = "query"
+    RUN = "run"
+
 @dataclass
 class SessionFSStatRequest:
     path: str
@@ -4300,29 +4308,41 @@ class SessionFSReaddirWithTypesEntry:
         return result
 
 @dataclass
-class SessionFSSetProviderRequest:
-    conventions: SessionFSSetProviderConventions
-    """Path conventions used by this filesystem"""
+class SessionFSSqliteRequest:
+    db_name: str
+    """Logical database name (e.g., 'session')"""
 
-    initial_cwd: str
-    """Initial working directory for sessions"""
+    query: str
+    """SQL query to execute"""
 
-    session_state_path: str
-    """Path within each session's SessionFs where the runtime stores files for that session"""
+    query_type: SessionFSSqliteQueryType
+    """How to execute the query: 'exec' for DDL/multi-statement (no results), 'query' for SELECT
+    (returns rows), 'run' for INSERT/UPDATE/DELETE (returns rowsAffected)
+    """
+    session_id: str
+    """Target session identifier"""
+
+    params: dict[str, Optional[float | str]] | None = None
+    """Optional named bind parameters"""
 
     @staticmethod
-    def from_dict(obj: Any) -> 'SessionFSSetProviderRequest':
+    def from_dict(obj: Any) -> 'SessionFSSqliteRequest':
         assert isinstance(obj, dict)
-        conventions = SessionFSSetProviderConventions(obj.get("conventions"))
-        initial_cwd = from_str(obj.get("initialCwd"))
-        session_state_path = from_str(obj.get("sessionStatePath"))
-        return SessionFSSetProviderRequest(conventions, initial_cwd, session_state_path)
+        db_name = from_str(obj.get("dbName"))
+        query = from_str(obj.get("query"))
+        query_type = SessionFSSqliteQueryType(obj.get("queryType"))
+        session_id = from_str(obj.get("sessionId"))
+        params = from_union([lambda x: from_dict(lambda x: from_union([from_none, from_float, from_str], x), x), from_none], obj.get("params"))
+        return SessionFSSqliteRequest(db_name, query, query_type, session_id, params)
 
     def to_dict(self) -> dict:
         result: dict = {}
-        result["conventions"] = to_enum(SessionFSSetProviderConventions, self.conventions)
-        result["initialCwd"] = from_str(self.initial_cwd)
-        result["sessionStatePath"] = from_str(self.session_state_path)
+        result["dbName"] = from_str(self.db_name)
+        result["query"] = from_str(self.query)
+        result["queryType"] = to_enum(SessionFSSqliteQueryType, self.query_type)
+        result["sessionId"] = from_str(self.session_id)
+        if self.params is not None:
+            result["params"] = from_union([lambda x: from_dict(lambda x: from_union([from_none, to_float, from_str], x), x), from_none], self.params)
         return result
 
 @dataclass
@@ -5470,6 +5490,44 @@ class SessionFSReaddirResult:
         return result
 
 @dataclass
+class SessionFSSqliteResult:
+    columns: list[str]
+    """Column names from the result set"""
+
+    rows: list[dict[str, Any]]
+    """For SELECT: array of row objects. For others: empty array."""
+
+    rows_affected: int
+    """Number of rows affected (for INSERT/UPDATE/DELETE)"""
+
+    error: SessionFSError | None = None
+    """Describes a filesystem error."""
+
+    last_insert_rowid: float | None = None
+    """Last inserted row ID (for INSERT)"""
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'SessionFSSqliteResult':
+        assert isinstance(obj, dict)
+        columns = from_list(from_str, obj.get("columns"))
+        rows = from_list(lambda x: from_dict(lambda x: x, x), obj.get("rows"))
+        rows_affected = from_int(obj.get("rowsAffected"))
+        error = from_union([SessionFSError.from_dict, from_none], obj.get("error"))
+        last_insert_rowid = from_union([from_float, from_none], obj.get("lastInsertRowid"))
+        return SessionFSSqliteResult(columns, rows, rows_affected, error, last_insert_rowid)
+
+    def to_dict(self) -> dict:
+        result: dict = {}
+        result["columns"] = from_list(from_str, self.columns)
+        result["rows"] = from_list(lambda x: from_dict(lambda x: x, x), self.rows)
+        result["rowsAffected"] = from_int(self.rows_affected)
+        if self.error is not None:
+            result["error"] = from_union([lambda x: to_class(SessionFSError, x), from_none], self.error)
+        if self.last_insert_rowid is not None:
+            result["lastInsertRowid"] = from_union([to_float, from_none], self.last_insert_rowid)
+        return result
+
+@dataclass
 class SessionFSStatResult:
     birthtime: datetime
     """ISO 8601 timestamp of creation"""
@@ -6090,6 +6148,40 @@ class ModelSwitchToRequest:
         return result
 
 @dataclass
+class SessionFSSetProviderRequest:
+    conventions: SessionFSSetProviderConventions
+    """Path conventions used by this filesystem"""
+
+    initial_cwd: str
+    """Initial working directory for sessions"""
+
+    session_state_path: str
+    """Path within each session's SessionFs where the runtime stores files for that session"""
+
+    handle_sqlite: bool | None = None
+    """When true, SQLite queries are routed through the SessionFs provider via RPC. When false
+    or omitted, the runtime uses a local node:sqlite database as a fallback.
+    """
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'SessionFSSetProviderRequest':
+        assert isinstance(obj, dict)
+        conventions = SessionFSSetProviderConventions(obj.get("conventions"))
+        initial_cwd = from_str(obj.get("initialCwd"))
+        session_state_path = from_str(obj.get("sessionStatePath"))
+        handle_sqlite = from_union([from_bool, from_none], obj.get("handleSqlite"))
+        return SessionFSSetProviderRequest(conventions, initial_cwd, session_state_path, handle_sqlite)
+
+    def to_dict(self) -> dict:
+        result: dict = {}
+        result["conventions"] = to_enum(SessionFSSetProviderConventions, self.conventions)
+        result["initialCwd"] = from_str(self.initial_cwd)
+        result["sessionStatePath"] = from_str(self.session_state_path)
+        if self.handle_sqlite is not None:
+            result["handleSqlite"] = from_union([from_bool, from_none], self.handle_sqlite)
+        return result
+
+@dataclass
 class TaskAgentInfo:
     agent_type: str
     """Type of agent running this task"""
@@ -6536,6 +6628,9 @@ class RPC:
     session_fs_set_provider_conventions: SessionFSSetProviderConventions
     session_fs_set_provider_request: SessionFSSetProviderRequest
     session_fs_set_provider_result: SessionFSSetProviderResult
+    session_fs_sqlite_query_type: SessionFSSqliteQueryType
+    session_fs_sqlite_request: SessionFSSqliteRequest
+    session_fs_sqlite_result: SessionFSSqliteResult
     session_fs_stat_request: SessionFSStatRequest
     session_fs_stat_result: SessionFSStatResult
     session_fs_write_file_request: SessionFSWriteFileRequest
@@ -6794,6 +6889,9 @@ class RPC:
         session_fs_set_provider_conventions = SessionFSSetProviderConventions(obj.get("SessionFsSetProviderConventions"))
         session_fs_set_provider_request = SessionFSSetProviderRequest.from_dict(obj.get("SessionFsSetProviderRequest"))
         session_fs_set_provider_result = SessionFSSetProviderResult.from_dict(obj.get("SessionFsSetProviderResult"))
+        session_fs_sqlite_query_type = SessionFSSqliteQueryType(obj.get("SessionFsSqliteQueryType"))
+        session_fs_sqlite_request = SessionFSSqliteRequest.from_dict(obj.get("SessionFsSqliteRequest"))
+        session_fs_sqlite_result = SessionFSSqliteResult.from_dict(obj.get("SessionFsSqliteResult"))
         session_fs_stat_request = SessionFSStatRequest.from_dict(obj.get("SessionFsStatRequest"))
         session_fs_stat_result = SessionFSStatResult.from_dict(obj.get("SessionFsStatResult"))
         session_fs_write_file_request = SessionFSWriteFileRequest.from_dict(obj.get("SessionFsWriteFileRequest"))
@@ -6878,7 +6976,7 @@ class RPC:
         workspaces_list_files_result = WorkspacesListFilesResult.from_dict(obj.get("WorkspacesListFilesResult"))
         workspaces_read_file_request = WorkspacesReadFileRequest.from_dict(obj.get("WorkspacesReadFileRequest"))
         workspaces_read_file_result = WorkspacesReadFileResult.from_dict(obj.get("WorkspacesReadFileResult"))
-        return RPC(account_get_quota_request, account_get_quota_result, account_quota_snapshot, agent_get_current_result, agent_info, agent_list, agent_reload_result, agent_select_request, agent_select_result, auth_info_type, command_list, commands_handle_pending_command_request, commands_handle_pending_command_result, commands_invoke_request, commands_list_request, commands_respond_to_queued_command_request, commands_respond_to_queued_command_result, connect_request, connect_result, current_model, discovered_mcp_server, discovered_mcp_server_source, discovered_mcp_server_type, embedded_blob_resource_contents, embedded_text_resource_contents, extension, extension_list, extensions_disable_request, extensions_enable_request, extension_source, extension_status, external_tool_result, external_tool_text_result_for_llm, external_tool_text_result_for_llm_content, external_tool_text_result_for_llm_content_audio, external_tool_text_result_for_llm_content_image, external_tool_text_result_for_llm_content_resource, external_tool_text_result_for_llm_content_resource_details, external_tool_text_result_for_llm_content_resource_link, external_tool_text_result_for_llm_content_resource_link_icon, external_tool_text_result_for_llm_content_resource_link_icon_theme, external_tool_text_result_for_llm_content_terminal, external_tool_text_result_for_llm_content_text, filter_mapping, filter_mapping_string, filter_mapping_value, fleet_start_request, fleet_start_result, handle_pending_tool_call_request, handle_pending_tool_call_result, history_compact_context_window, history_compact_result, history_truncate_request, history_truncate_result, instructions_get_sources_result, instructions_sources, instructions_sources_location, instructions_sources_type, log_request, log_result, mcp_config_add_request, mcp_config_disable_request, mcp_config_enable_request, mcp_config_list, mcp_config_remove_request, mcp_config_update_request, mcp_disable_request, mcp_discover_request, mcp_discover_result, mcp_enable_request, mcp_oauth_login_request, mcp_oauth_login_result, mcp_server, mcp_server_config, mcp_server_config_http, mcp_server_config_http_oauth_grant_type, mcp_server_config_http_type, mcp_server_config_local, mcp_server_config_local_type, mcp_server_list, mcp_server_source, mcp_server_status, model, model_billing, model_billing_token_prices, model_capabilities, model_capabilities_limits, model_capabilities_limits_vision, model_capabilities_override, model_capabilities_override_limits, model_capabilities_override_limits_vision, model_capabilities_override_supports, model_capabilities_supports, model_list, model_picker_category, model_picker_price_category, model_policy, models_list_request, model_switch_to_request, model_switch_to_result, mode_set_request, name_get_result, name_set_request, permission_decision, permission_decision_approve_for_location, permission_decision_approve_for_location_approval, permission_decision_approve_for_location_approval_commands, permission_decision_approve_for_location_approval_custom_tool, permission_decision_approve_for_location_approval_extension_management, permission_decision_approve_for_location_approval_extension_permission_access, permission_decision_approve_for_location_approval_mcp, permission_decision_approve_for_location_approval_mcp_sampling, permission_decision_approve_for_location_approval_memory, permission_decision_approve_for_location_approval_read, permission_decision_approve_for_location_approval_write, permission_decision_approve_for_session, permission_decision_approve_for_session_approval, permission_decision_approve_for_session_approval_commands, permission_decision_approve_for_session_approval_custom_tool, permission_decision_approve_for_session_approval_extension_management, permission_decision_approve_for_session_approval_extension_permission_access, permission_decision_approve_for_session_approval_mcp, permission_decision_approve_for_session_approval_mcp_sampling, permission_decision_approve_for_session_approval_memory, permission_decision_approve_for_session_approval_read, permission_decision_approve_for_session_approval_write, permission_decision_approve_once, permission_decision_approve_permanently, permission_decision_reject, permission_decision_request, permission_decision_user_not_available, permission_request_result, permissions_reset_session_approvals_request, permissions_reset_session_approvals_result, permissions_set_approve_all_request, permissions_set_approve_all_result, ping_request, ping_result, plan_read_result, plan_update_request, plugin, plugin_list, queued_command_handled, queued_command_not_handled, queued_command_result, remote_enable_request, remote_enable_result, remote_session_mode, server_skill, server_skill_list, session_auth_status, session_fs_append_file_request, session_fs_error, session_fs_error_code, session_fs_exists_request, session_fs_exists_result, session_fs_mkdir_request, session_fs_readdir_request, session_fs_readdir_result, session_fs_readdir_with_types_entry, session_fs_readdir_with_types_entry_type, session_fs_readdir_with_types_request, session_fs_readdir_with_types_result, session_fs_read_file_request, session_fs_read_file_result, session_fs_rename_request, session_fs_rm_request, session_fs_set_provider_conventions, session_fs_set_provider_request, session_fs_set_provider_result, session_fs_stat_request, session_fs_stat_result, session_fs_write_file_request, session_log_level, session_mode, sessions_fork_request, sessions_fork_result, shell_exec_request, shell_exec_result, shell_kill_request, shell_kill_result, shell_kill_signal, skill, skill_list, skills_config_set_disabled_skills_request, skills_disable_request, skills_discover_request, skills_enable_request, skills_load_diagnostics, slash_command_agent_prompt_mode, slash_command_agent_prompt_result, slash_command_completed_result, slash_command_info, slash_command_input, slash_command_input_completion, slash_command_invocation_result, slash_command_kind, slash_command_text_result, task_agent_info, task_agent_info_execution_mode, task_agent_info_status, task_info, task_list, tasks_cancel_request, tasks_cancel_result, task_shell_info, task_shell_info_attachment_mode, task_shell_info_execution_mode, task_shell_info_status, tasks_promote_to_background_request, tasks_promote_to_background_result, tasks_remove_request, tasks_remove_result, tasks_send_message_request, tasks_send_message_result, tasks_start_agent_request, tasks_start_agent_result, tool, tool_list, tools_list_request, ui_elicitation_array_any_of_field, ui_elicitation_array_any_of_field_items, ui_elicitation_array_any_of_field_items_any_of, ui_elicitation_array_enum_field, ui_elicitation_array_enum_field_items, ui_elicitation_field_value, ui_elicitation_request, ui_elicitation_response, ui_elicitation_response_action, ui_elicitation_response_content, ui_elicitation_result, ui_elicitation_schema, ui_elicitation_schema_property, ui_elicitation_schema_property_boolean, ui_elicitation_schema_property_number, ui_elicitation_schema_property_number_type, ui_elicitation_schema_property_string, ui_elicitation_schema_property_string_format, ui_elicitation_string_enum_field, ui_elicitation_string_one_of_field, ui_elicitation_string_one_of_field_one_of, ui_handle_pending_elicitation_request, usage_get_metrics_result, usage_metrics_code_changes, usage_metrics_model_metric, usage_metrics_model_metric_requests, usage_metrics_model_metric_token_detail, usage_metrics_model_metric_usage, usage_metrics_token_detail, workspaces_create_file_request, workspaces_get_workspace_result, workspaces_list_files_result, workspaces_read_file_request, workspaces_read_file_result)
+        return RPC(account_get_quota_request, account_get_quota_result, account_quota_snapshot, agent_get_current_result, agent_info, agent_list, agent_reload_result, agent_select_request, agent_select_result, auth_info_type, command_list, commands_handle_pending_command_request, commands_handle_pending_command_result, commands_invoke_request, commands_list_request, commands_respond_to_queued_command_request, commands_respond_to_queued_command_result, connect_request, connect_result, current_model, discovered_mcp_server, discovered_mcp_server_source, discovered_mcp_server_type, embedded_blob_resource_contents, embedded_text_resource_contents, extension, extension_list, extensions_disable_request, extensions_enable_request, extension_source, extension_status, external_tool_result, external_tool_text_result_for_llm, external_tool_text_result_for_llm_content, external_tool_text_result_for_llm_content_audio, external_tool_text_result_for_llm_content_image, external_tool_text_result_for_llm_content_resource, external_tool_text_result_for_llm_content_resource_details, external_tool_text_result_for_llm_content_resource_link, external_tool_text_result_for_llm_content_resource_link_icon, external_tool_text_result_for_llm_content_resource_link_icon_theme, external_tool_text_result_for_llm_content_terminal, external_tool_text_result_for_llm_content_text, filter_mapping, filter_mapping_string, filter_mapping_value, fleet_start_request, fleet_start_result, handle_pending_tool_call_request, handle_pending_tool_call_result, history_compact_context_window, history_compact_result, history_truncate_request, history_truncate_result, instructions_get_sources_result, instructions_sources, instructions_sources_location, instructions_sources_type, log_request, log_result, mcp_config_add_request, mcp_config_disable_request, mcp_config_enable_request, mcp_config_list, mcp_config_remove_request, mcp_config_update_request, mcp_disable_request, mcp_discover_request, mcp_discover_result, mcp_enable_request, mcp_oauth_login_request, mcp_oauth_login_result, mcp_server, mcp_server_config, mcp_server_config_http, mcp_server_config_http_oauth_grant_type, mcp_server_config_http_type, mcp_server_config_local, mcp_server_config_local_type, mcp_server_list, mcp_server_source, mcp_server_status, model, model_billing, model_billing_token_prices, model_capabilities, model_capabilities_limits, model_capabilities_limits_vision, model_capabilities_override, model_capabilities_override_limits, model_capabilities_override_limits_vision, model_capabilities_override_supports, model_capabilities_supports, model_list, model_picker_category, model_picker_price_category, model_policy, models_list_request, model_switch_to_request, model_switch_to_result, mode_set_request, name_get_result, name_set_request, permission_decision, permission_decision_approve_for_location, permission_decision_approve_for_location_approval, permission_decision_approve_for_location_approval_commands, permission_decision_approve_for_location_approval_custom_tool, permission_decision_approve_for_location_approval_extension_management, permission_decision_approve_for_location_approval_extension_permission_access, permission_decision_approve_for_location_approval_mcp, permission_decision_approve_for_location_approval_mcp_sampling, permission_decision_approve_for_location_approval_memory, permission_decision_approve_for_location_approval_read, permission_decision_approve_for_location_approval_write, permission_decision_approve_for_session, permission_decision_approve_for_session_approval, permission_decision_approve_for_session_approval_commands, permission_decision_approve_for_session_approval_custom_tool, permission_decision_approve_for_session_approval_extension_management, permission_decision_approve_for_session_approval_extension_permission_access, permission_decision_approve_for_session_approval_mcp, permission_decision_approve_for_session_approval_mcp_sampling, permission_decision_approve_for_session_approval_memory, permission_decision_approve_for_session_approval_read, permission_decision_approve_for_session_approval_write, permission_decision_approve_once, permission_decision_approve_permanently, permission_decision_reject, permission_decision_request, permission_decision_user_not_available, permission_request_result, permissions_reset_session_approvals_request, permissions_reset_session_approvals_result, permissions_set_approve_all_request, permissions_set_approve_all_result, ping_request, ping_result, plan_read_result, plan_update_request, plugin, plugin_list, queued_command_handled, queued_command_not_handled, queued_command_result, remote_enable_request, remote_enable_result, remote_session_mode, server_skill, server_skill_list, session_auth_status, session_fs_append_file_request, session_fs_error, session_fs_error_code, session_fs_exists_request, session_fs_exists_result, session_fs_mkdir_request, session_fs_readdir_request, session_fs_readdir_result, session_fs_readdir_with_types_entry, session_fs_readdir_with_types_entry_type, session_fs_readdir_with_types_request, session_fs_readdir_with_types_result, session_fs_read_file_request, session_fs_read_file_result, session_fs_rename_request, session_fs_rm_request, session_fs_set_provider_conventions, session_fs_set_provider_request, session_fs_set_provider_result, session_fs_sqlite_query_type, session_fs_sqlite_request, session_fs_sqlite_result, session_fs_stat_request, session_fs_stat_result, session_fs_write_file_request, session_log_level, session_mode, sessions_fork_request, sessions_fork_result, shell_exec_request, shell_exec_result, shell_kill_request, shell_kill_result, shell_kill_signal, skill, skill_list, skills_config_set_disabled_skills_request, skills_disable_request, skills_discover_request, skills_enable_request, skills_load_diagnostics, slash_command_agent_prompt_mode, slash_command_agent_prompt_result, slash_command_completed_result, slash_command_info, slash_command_input, slash_command_input_completion, slash_command_invocation_result, slash_command_kind, slash_command_text_result, task_agent_info, task_agent_info_execution_mode, task_agent_info_status, task_info, task_list, tasks_cancel_request, tasks_cancel_result, task_shell_info, task_shell_info_attachment_mode, task_shell_info_execution_mode, task_shell_info_status, tasks_promote_to_background_request, tasks_promote_to_background_result, tasks_remove_request, tasks_remove_result, tasks_send_message_request, tasks_send_message_result, tasks_start_agent_request, tasks_start_agent_result, tool, tool_list, tools_list_request, ui_elicitation_array_any_of_field, ui_elicitation_array_any_of_field_items, ui_elicitation_array_any_of_field_items_any_of, ui_elicitation_array_enum_field, ui_elicitation_array_enum_field_items, ui_elicitation_field_value, ui_elicitation_request, ui_elicitation_response, ui_elicitation_response_action, ui_elicitation_response_content, ui_elicitation_result, ui_elicitation_schema, ui_elicitation_schema_property, ui_elicitation_schema_property_boolean, ui_elicitation_schema_property_number, ui_elicitation_schema_property_number_type, ui_elicitation_schema_property_string, ui_elicitation_schema_property_string_format, ui_elicitation_string_enum_field, ui_elicitation_string_one_of_field, ui_elicitation_string_one_of_field_one_of, ui_handle_pending_elicitation_request, usage_get_metrics_result, usage_metrics_code_changes, usage_metrics_model_metric, usage_metrics_model_metric_requests, usage_metrics_model_metric_token_detail, usage_metrics_model_metric_usage, usage_metrics_token_detail, workspaces_create_file_request, workspaces_get_workspace_result, workspaces_list_files_result, workspaces_read_file_request, workspaces_read_file_result)
 
     def to_dict(self) -> dict:
         result: dict = {}
@@ -7052,6 +7150,9 @@ class RPC:
         result["SessionFsSetProviderConventions"] = to_enum(SessionFSSetProviderConventions, self.session_fs_set_provider_conventions)
         result["SessionFsSetProviderRequest"] = to_class(SessionFSSetProviderRequest, self.session_fs_set_provider_request)
         result["SessionFsSetProviderResult"] = to_class(SessionFSSetProviderResult, self.session_fs_set_provider_result)
+        result["SessionFsSqliteQueryType"] = to_enum(SessionFSSqliteQueryType, self.session_fs_sqlite_query_type)
+        result["SessionFsSqliteRequest"] = to_class(SessionFSSqliteRequest, self.session_fs_sqlite_request)
+        result["SessionFsSqliteResult"] = to_class(SessionFSSqliteResult, self.session_fs_sqlite_result)
         result["SessionFsStatRequest"] = to_class(SessionFSStatRequest, self.session_fs_stat_request)
         result["SessionFsStatResult"] = to_class(SessionFSStatResult, self.session_fs_stat_result)
         result["SessionFsWriteFileRequest"] = to_class(SessionFSWriteFileRequest, self.session_fs_write_file_request)
@@ -7188,8 +7289,8 @@ class ServerModelsApi:
     def __init__(self, client: "JsonRpcClient"):
         self._client = client
 
-    async def list(self, params: ModelsListRequest | None = None, *, timeout: float | None = None) -> ModelList:
-        params_dict = {k: v for k, v in params.to_dict().items() if v is not None} if params is not None else {}
+    async def list(self, params: ModelsListRequest, *, timeout: float | None = None) -> ModelList:
+        params_dict = {k: v for k, v in params.to_dict().items() if v is not None}
         return ModelList.from_dict(_patch_model_capabilities(await self._client.request("models.list", params_dict, **_timeout_kwargs(timeout))))
 
 
@@ -7206,8 +7307,8 @@ class ServerAccountApi:
     def __init__(self, client: "JsonRpcClient"):
         self._client = client
 
-    async def get_quota(self, params: AccountGetQuotaRequest | None = None, *, timeout: float | None = None) -> AccountGetQuotaResult:
-        params_dict = {k: v for k, v in params.to_dict().items() if v is not None} if params is not None else {}
+    async def get_quota(self, params: AccountGetQuotaRequest, *, timeout: float | None = None) -> AccountGetQuotaResult:
+        params_dict = {k: v for k, v in params.to_dict().items() if v is not None}
         return AccountGetQuotaResult.from_dict(await self._client.request("account.getQuota", params_dict, **_timeout_kwargs(timeout)))
 
 
@@ -7763,6 +7864,8 @@ class SessionFsHandler(Protocol):
         pass
     async def rename(self, params: SessionFSRenameRequest) -> SessionFSError | None:
         pass
+    async def sqlite(self, params: SessionFSSqliteRequest) -> SessionFSSqliteResult:
+        pass
 
 @dataclass
 class ClientSessionApiHandlers:
@@ -7843,3 +7946,10 @@ def register_client_session_api_handlers(
         result = await handler.rename(request)
         return result.to_dict() if result is not None else None
     client.set_request_handler("sessionFs.rename", handle_session_fs_rename)
+    async def handle_session_fs_sqlite(params: dict) -> dict | None:
+        request = SessionFSSqliteRequest.from_dict(params)
+        handler = get_handlers(request.session_id).session_fs
+        if handler is None: raise RuntimeError(f"No session_fs handler registered for session: {request.session_id}")
+        result = await handler.sqlite(request)
+        return result.to_dict()
+    client.set_request_handler("sessionFs.sqlite", handle_session_fs_sqlite)

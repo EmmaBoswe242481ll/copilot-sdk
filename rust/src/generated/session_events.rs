@@ -411,9 +411,6 @@ pub struct SessionStartData {
     pub context: Option<WorkingDirectoryContext>,
     /// Version string of the Copilot application
     pub copilot_version: String,
-    /// When set, identifies a parent session whose context this session continues — e.g., a detached headless rem-agent run launched on the parent's interactive shutdown. Telemetry from this session is reported under the parent's session_id.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub detached_from_spawning_parent_session_id: Option<String>,
     /// Identifier of the software producing the events (e.g., "copilot-agent")
     pub producer: String,
     /// Reasoning effort level used for model calls, if applicable (e.g. "low", "medium", "high", "xhigh")
@@ -517,7 +514,7 @@ pub struct SessionTitleChangedData {
     pub title: String,
 }
 
-/// Scheduled prompt registered via /every or /after
+/// Scheduled prompt registered via /every
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionScheduleCreatedData {
@@ -527,9 +524,6 @@ pub struct SessionScheduleCreatedData {
     pub interval_ms: i64,
     /// Prompt text that gets enqueued on every tick
     pub prompt: String,
-    /// Whether the schedule re-arms after each tick (`/every`) or fires once (`/after`)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub recurring: Option<bool>,
 }
 
 /// Scheduled prompt cancelled from the schedule manager dialog
@@ -992,9 +986,6 @@ pub struct UserMessageData {
     /// CAPI interaction ID for correlating this user message with its turn
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interaction_id: Option<String>,
-    /// True when this user message was auto-injected by autopilot's continuation loop rather than typed by the user; used to distinguish autopilot-driven turns in telemetry.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_autopilot_continuation: Option<bool>,
     /// Path-backed native document attachments that stayed on the tagged_files path flow because native upload would exceed the request size limit
     #[serde(default)]
     pub native_document_path_fallback_paths: Vec<String>,
@@ -1096,12 +1087,6 @@ pub struct AssistantMessageToolRequest {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssistantMessageData {
-    /// Raw Anthropic content array with advisor blocks (server_tool_use, advisor_tool_result) for verbatim round-tripping
-    #[serde(default)]
-    pub anthropic_advisor_blocks: Vec<serde_json::Value>,
-    /// Anthropic advisor model ID used for this response, for timeline display on replay
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub anthropic_advisor_model: Option<String>,
     /// The assistant's text response content
     pub content: String,
     /// Encrypted reasoning content from OpenAI models. Session-bound and stripped on resume.
@@ -1112,9 +1097,6 @@ pub struct AssistantMessageData {
     pub interaction_id: Option<String>,
     /// Unique identifier for this assistant message
     pub message_id: String,
-    /// Model that produced this assistant message, if known
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
     /// Actual output token count from the API response (completion_tokens), used for accurate token accounting
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_tokens: Option<f64>,
@@ -1228,9 +1210,6 @@ pub struct AssistantUsageData {
     /// Completion ID from the model provider (e.g., chatcmpl-abc123)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_call_id: Option<String>,
-    /// API endpoint used for this model call, matching CAPI supported_endpoints vocabulary
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub api_endpoint: Option<AssistantUsageApiEndpoint>,
     /// Number of tokens read from prompt cache
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_read_tokens: Option<f64>,
@@ -1314,8 +1293,8 @@ pub struct ModelCallFailureData {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AbortData {
-    /// Finite reason code describing why the current turn was aborted
-    pub reason: AbortReason,
+    /// Reason the current turn was aborted (e.g., "user initiated")
+    pub reason: String,
 }
 
 /// User-initiated tool invocation request with tool name and arguments
@@ -1471,9 +1450,6 @@ pub struct SubagentStartedData {
     pub agent_display_name: String,
     /// Internal name of the sub-agent
     pub agent_name: String,
-    /// Model the sub-agent will run with, when known at start. Surfaced in the timeline for auto-selected sub-agents (e.g. rubber-duck).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
     /// Tool call ID of the parent tool invocation that spawned this sub-agent
     pub tool_call_id: String,
 }
@@ -1808,37 +1784,6 @@ pub struct PermissionRequestHook {
     pub tool_name: String,
 }
 
-/// Extension management permission request
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PermissionRequestExtensionManagement {
-    /// Name of the extension being managed
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub extension_name: Option<String>,
-    /// Permission kind discriminator
-    pub kind: PermissionRequestExtensionManagementKind,
-    /// The extension management operation (scaffold, reload)
-    pub operation: String,
-    /// Tool call ID that triggered this permission request
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_call_id: Option<String>,
-}
-
-/// Extension permission access request
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PermissionRequestExtensionPermissionAccess {
-    /// Capabilities the extension is requesting
-    pub capabilities: Vec<String>,
-    /// Name of the extension requesting permission access
-    pub extension_name: String,
-    /// Permission kind discriminator
-    pub kind: PermissionRequestExtensionPermissionAccessKind,
-    /// Tool call ID that triggered this permission request
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_call_id: Option<String>,
-}
-
 /// Shell command permission prompt
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2013,37 +1958,6 @@ pub struct PermissionPromptRequestHook {
     pub tool_name: String,
 }
 
-/// Extension management permission prompt
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PermissionPromptRequestExtensionManagement {
-    /// Name of the extension being managed
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub extension_name: Option<String>,
-    /// Prompt kind discriminator
-    pub kind: PermissionPromptRequestExtensionManagementKind,
-    /// The extension management operation (scaffold, reload)
-    pub operation: String,
-    /// Tool call ID that triggered this permission request
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_call_id: Option<String>,
-}
-
-/// Extension permission access prompt
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PermissionPromptRequestExtensionPermissionAccess {
-    /// Capabilities the extension is requesting
-    pub capabilities: Vec<String>,
-    /// Name of the extension requesting permission access
-    pub extension_name: String,
-    /// Prompt kind discriminator
-    pub kind: PermissionPromptRequestExtensionPermissionAccessKind,
-    /// Tool call ID that triggered this permission request
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_call_id: Option<String>,
-}
-
 /// Permission request notification requiring client approval with request details
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2115,25 +2029,6 @@ pub struct UserToolSessionApprovalCustomTool {
     pub kind: UserToolSessionApprovalCustomToolKind,
     /// Custom tool name
     pub tool_name: String,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UserToolSessionApprovalExtensionManagement {
-    /// Extension management approval kind
-    pub kind: UserToolSessionApprovalExtensionManagementKind,
-    /// Optional operation identifier
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub operation: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UserToolSessionApprovalExtensionPermissionAccess {
-    /// Extension name
-    pub extension_name: String,
-    /// Extension permission access approval kind
-    pub kind: UserToolSessionApprovalExtensionPermissionAccessKind,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2756,23 +2651,6 @@ pub enum AssistantMessageToolRequestType {
     Unknown,
 }
 
-/// API endpoint used for this model call, matching CAPI supported_endpoints vocabulary
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AssistantUsageApiEndpoint {
-    #[serde(rename = "/chat/completions")]
-    ChatCompletions,
-    #[serde(rename = "/v1/messages")]
-    V1Messages,
-    #[serde(rename = "/responses")]
-    Responses,
-    #[serde(rename = "ws:/responses")]
-    WsResponses,
-    /// Unknown variant for forward compatibility.
-    #[default]
-    #[serde(other)]
-    Unknown,
-}
-
 /// Where the failed model call originated
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ModelCallFailureSource {
@@ -2782,21 +2660,6 @@ pub enum ModelCallFailureSource {
     Subagent,
     #[serde(rename = "mcp_sampling")]
     McpSampling,
-    /// Unknown variant for forward compatibility.
-    #[default]
-    #[serde(other)]
-    Unknown,
-}
-
-/// Finite reason code describing why the current turn was aborted
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AbortReason {
-    #[serde(rename = "user_initiated")]
-    UserInitiated,
-    #[serde(rename = "remote_command")]
-    RemoteCommand,
-    #[serde(rename = "user_abort")]
-    UserAbort,
     /// Unknown variant for forward compatibility.
     #[default]
     #[serde(other)]
@@ -2906,22 +2769,6 @@ pub enum PermissionRequestHookKind {
     Hook,
 }
 
-/// Permission kind discriminator
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PermissionRequestExtensionManagementKind {
-    #[serde(rename = "extension-management")]
-    #[default]
-    ExtensionManagement,
-}
-
-/// Permission kind discriminator
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PermissionRequestExtensionPermissionAccessKind {
-    #[serde(rename = "extension-permission-access")]
-    #[default]
-    ExtensionPermissionAccess,
-}
-
 /// Details of the permission being requested
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -2934,8 +2781,6 @@ pub enum PermissionRequest {
     Memory(PermissionRequestMemory),
     CustomTool(PermissionRequestCustomTool),
     Hook(PermissionRequestHook),
-    ExtensionManagement(PermissionRequestExtensionManagement),
-    ExtensionPermissionAccess(PermissionRequestExtensionPermissionAccess),
 }
 
 /// Prompt kind discriminator
@@ -3051,22 +2896,6 @@ pub enum PermissionPromptRequestHookKind {
     Hook,
 }
 
-/// Prompt kind discriminator
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PermissionPromptRequestExtensionManagementKind {
-    #[serde(rename = "extension-management")]
-    #[default]
-    ExtensionManagement,
-}
-
-/// Prompt kind discriminator
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PermissionPromptRequestExtensionPermissionAccessKind {
-    #[serde(rename = "extension-permission-access")]
-    #[default]
-    ExtensionPermissionAccess,
-}
-
 /// Derived user-facing permission prompt details for UI consumers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -3080,8 +2909,6 @@ pub enum PermissionPromptRequest {
     CustomTool(PermissionPromptRequestCustomTool),
     Path(PermissionPromptRequestPath),
     Hook(PermissionPromptRequestHook),
-    ExtensionManagement(PermissionPromptRequestExtensionManagement),
-    ExtensionPermissionAccess(PermissionPromptRequestExtensionPermissionAccess),
 }
 
 /// The permission request was approved
@@ -3140,22 +2967,6 @@ pub enum UserToolSessionApprovalCustomToolKind {
     CustomTool,
 }
 
-/// Extension management approval kind
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum UserToolSessionApprovalExtensionManagementKind {
-    #[serde(rename = "extension-management")]
-    #[default]
-    ExtensionManagement,
-}
-
-/// Extension permission access approval kind
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum UserToolSessionApprovalExtensionPermissionAccessKind {
-    #[serde(rename = "extension-permission-access")]
-    #[default]
-    ExtensionPermissionAccess,
-}
-
 /// The approval to add as a session-scoped rule
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -3166,8 +2977,6 @@ pub enum UserToolSessionApproval {
     Mcp(UserToolSessionApprovalMcp),
     Memory(UserToolSessionApprovalMemory),
     CustomTool(UserToolSessionApprovalCustomTool),
-    ExtensionManagement(UserToolSessionApprovalExtensionManagement),
-    ExtensionPermissionAccess(UserToolSessionApprovalExtensionPermissionAccess),
 }
 
 /// Approved and remembered for the rest of the session

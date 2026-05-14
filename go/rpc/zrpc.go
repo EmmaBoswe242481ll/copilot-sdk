@@ -1431,6 +1431,9 @@ type SessionFsRmRequest struct {
 type SessionFsSetProviderRequest struct {
 	// Path conventions used by this filesystem
 	Conventions SessionFsSetProviderConventions `json:"conventions"`
+	// When true, SQLite queries are routed through the SessionFs provider via RPC. When false
+	// or omitted, the runtime uses a local node:sqlite database as a fallback.
+	HandleSqlite *bool `json:"handleSqlite,omitempty"`
 	// Initial working directory for sessions
 	InitialCwd string `json:"initialCwd"`
 	// Path within each session's SessionFs where the runtime stores files for that session
@@ -1440,6 +1443,33 @@ type SessionFsSetProviderRequest struct {
 type SessionFsSetProviderResult struct {
 	// Whether the provider was set successfully
 	Success bool `json:"success"`
+}
+
+type SessionFsSqliteRequest struct {
+	// Logical database name (e.g., 'session')
+	DbName string `json:"dbName"`
+	// Optional named bind parameters
+	Params map[string]any `json:"params,omitempty"`
+	// SQL query to execute
+	Query string `json:"query"`
+	// How to execute the query: 'exec' for DDL/multi-statement (no results), 'query' for SELECT
+	// (returns rows), 'run' for INSERT/UPDATE/DELETE (returns rowsAffected)
+	QueryType SessionFsSqliteQueryType `json:"queryType"`
+	// Target session identifier
+	SessionID string `json:"sessionId"`
+}
+
+type SessionFsSqliteResult struct {
+	// Column names from the result set
+	Columns []string `json:"columns"`
+	// Describes a filesystem error.
+	Error *SessionFsError `json:"error,omitempty"`
+	// Last inserted row ID (for INSERT)
+	LastInsertRowid *float64 `json:"lastInsertRowid,omitempty"`
+	// For SELECT: array of row objects. For others: empty array.
+	Rows []map[string]any `json:"rows"`
+	// Number of rows affected (for INSERT/UPDATE/DELETE)
+	RowsAffected int64 `json:"rowsAffected"`
 }
 
 type SessionFsStatRequest struct {
@@ -2462,6 +2492,16 @@ const (
 	SessionFsSetProviderConventionsWindows SessionFsSetProviderConventions = "windows"
 )
 
+// How to execute the query: 'exec' for DDL/multi-statement (no results), 'query' for SELECT
+// (returns rows), 'run' for INSERT/UPDATE/DELETE (returns rowsAffected)
+type SessionFsSqliteQueryType string
+
+const (
+	SessionFsSqliteQueryTypeExec  SessionFsSqliteQueryType = "exec"
+	SessionFsSqliteQueryTypeQuery SessionFsSqliteQueryType = "query"
+	SessionFsSqliteQueryTypeRun   SessionFsSqliteQueryType = "run"
+)
+
 // Log severity level. Determines how the message is displayed in the timeline. Defaults to
 // "info".
 type SessionLogLevel string
@@ -2642,12 +2682,8 @@ type serverApi struct {
 
 type ServerAccountApi serverApi
 
-func (a *ServerAccountApi) GetQuota(ctx context.Context, params ...*AccountGetQuotaRequest) (*AccountGetQuotaResult, error) {
-	var requestParams *AccountGetQuotaRequest
-	if len(params) > 0 {
-		requestParams = params[0]
-	}
-	raw, err := a.client.Request("account.getQuota", requestParams)
+func (a *ServerAccountApi) GetQuota(ctx context.Context, params *AccountGetQuotaRequest) (*AccountGetQuotaResult, error) {
+	raw, err := a.client.Request("account.getQuota", params)
 	if err != nil {
 		return nil, err
 	}
@@ -2752,12 +2788,8 @@ func (s *ServerMcpApi) Config() *ServerMcpConfigApi {
 
 type ServerModelsApi serverApi
 
-func (a *ServerModelsApi) List(ctx context.Context, params ...*ModelsListRequest) (*ModelList, error) {
-	var requestParams *ModelsListRequest
-	if len(params) > 0 {
-		requestParams = params[0]
-	}
-	raw, err := a.client.Request("models.list", requestParams)
+func (a *ServerModelsApi) List(ctx context.Context, params *ModelsListRequest) (*ModelList, error) {
+	raw, err := a.client.Request("models.list", params)
 	if err != nil {
 		return nil, err
 	}
@@ -4006,6 +4038,7 @@ type SessionFsHandler interface {
 	ReadFile(request *SessionFsReadFileRequest) (*SessionFsReadFileResult, error)
 	Rename(request *SessionFsRenameRequest) (*SessionFsError, error)
 	Rm(request *SessionFsRmRequest) (*SessionFsError, error)
+	Sqlite(request *SessionFsSqliteRequest) (*SessionFsSqliteResult, error)
 	Stat(request *SessionFsStatRequest) (*SessionFsStatResult, error)
 	WriteFile(request *SessionFsWriteFileRequest) (*SessionFsError, error)
 }
@@ -4172,6 +4205,25 @@ func RegisterClientSessionApiHandlers(client *jsonrpc2.Client, getHandlers func(
 			return nil, &jsonrpc2.Error{Code: -32603, Message: fmt.Sprintf("No sessionFs handler registered for session: %s", request.SessionID)}
 		}
 		result, err := handlers.SessionFs.Rm(&request)
+		if err != nil {
+			return nil, clientSessionHandlerError(err)
+		}
+		raw, err := json.Marshal(result)
+		if err != nil {
+			return nil, &jsonrpc2.Error{Code: -32603, Message: fmt.Sprintf("Failed to marshal response: %v", err)}
+		}
+		return raw, nil
+	})
+	client.SetRequestHandler("sessionFs.sqlite", func(params json.RawMessage) (json.RawMessage, *jsonrpc2.Error) {
+		var request SessionFsSqliteRequest
+		if err := json.Unmarshal(params, &request); err != nil {
+			return nil, &jsonrpc2.Error{Code: -32602, Message: fmt.Sprintf("Invalid params: %v", err)}
+		}
+		handlers := getHandlers(request.SessionID)
+		if handlers == nil || handlers.SessionFs == nil {
+			return nil, &jsonrpc2.Error{Code: -32603, Message: fmt.Sprintf("No sessionFs handler registered for session: %s", request.SessionID)}
+		}
+		result, err := handlers.SessionFs.Sqlite(&request)
 		if err != nil {
 			return nil, clientSessionHandlerError(err)
 		}

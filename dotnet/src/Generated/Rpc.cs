@@ -503,6 +503,10 @@ internal sealed class SessionFsSetProviderRequest
     [JsonPropertyName("conventions")]
     public SessionFsSetProviderConventions Conventions { get; set; }
 
+    /// <summary>When true, SQLite queries are routed through the SessionFs provider via RPC. When false or omitted, the runtime uses a local node:sqlite database as a fallback.</summary>
+    [JsonPropertyName("handleSqlite")]
+    public bool? HandleSqlite { get; set; }
+
     /// <summary>Initial working directory for sessions.</summary>
     [JsonPropertyName("initialCwd")]
     public string InitialCwd { get; set; } = string.Empty;
@@ -3131,6 +3135,55 @@ public sealed class SessionFsRenameRequest
     public string Src { get; set; } = string.Empty;
 }
 
+/// <summary>RPC data type for SessionFsSqlite operations.</summary>
+public sealed class SessionFsSqliteResult
+{
+    /// <summary>Column names from the result set.</summary>
+    [JsonPropertyName("columns")]
+    public IList<string> Columns { get => field ??= []; set; }
+
+    /// <summary>Describes a filesystem error.</summary>
+    [JsonPropertyName("error")]
+    public SessionFsError? Error { get; set; }
+
+    /// <summary>Last inserted row ID (for INSERT).</summary>
+    [JsonPropertyName("lastInsertRowid")]
+    public double? LastInsertRowid { get; set; }
+
+    /// <summary>For SELECT: array of row objects. For others: empty array.</summary>
+    [JsonPropertyName("rows")]
+    public IList<IDictionary<string, object>> Rows { get => field ??= []; set; }
+
+    /// <summary>Number of rows affected (for INSERT/UPDATE/DELETE).</summary>
+    [Range((double)0, (double)long.MaxValue)]
+    [JsonPropertyName("rowsAffected")]
+    public long RowsAffected { get; set; }
+}
+
+/// <summary>RPC data type for SessionFsSqlite operations.</summary>
+public sealed class SessionFsSqliteRequest
+{
+    /// <summary>Logical database name (e.g., 'session').</summary>
+    [JsonPropertyName("dbName")]
+    public string DbName { get; set; } = string.Empty;
+
+    /// <summary>Optional named bind parameters.</summary>
+    [JsonPropertyName("params")]
+    public IDictionary<string, object>? Params { get; set; }
+
+    /// <summary>SQL query to execute.</summary>
+    [JsonPropertyName("query")]
+    public string Query { get; set; } = string.Empty;
+
+    /// <summary>How to execute the query: 'exec' for DDL/multi-statement (no results), 'query' for SELECT (returns rows), 'run' for INSERT/UPDATE/DELETE (returns rowsAffected).</summary>
+    [JsonPropertyName("queryType")]
+    public SessionFsSqliteQueryType QueryType { get; set; }
+
+    /// <summary>Target session identifier.</summary>
+    [JsonPropertyName("sessionId")]
+    public string SessionId { get; set; } = string.Empty;
+}
+
 /// <summary>Model capability category for grouping in the model picker.</summary>
 [JsonConverter(typeof(Converter))]
 [DebuggerDisplay("{Value,nq}")]
@@ -4978,6 +5031,71 @@ public readonly struct SessionFsReaddirWithTypesEntryType : IEquatable<SessionFs
 }
 
 
+/// <summary>How to execute the query: 'exec' for DDL/multi-statement (no results), 'query' for SELECT (returns rows), 'run' for INSERT/UPDATE/DELETE (returns rowsAffected).</summary>
+[JsonConverter(typeof(Converter))]
+[DebuggerDisplay("{Value,nq}")]
+public readonly struct SessionFsSqliteQueryType : IEquatable<SessionFsSqliteQueryType>
+{
+    private readonly string? _value;
+
+    /// <summary>Initializes a new instance of the <see cref="SessionFsSqliteQueryType"/> struct.</summary>
+    /// <param name="value">The value to associate with this <see cref="SessionFsSqliteQueryType"/>.</param>
+    [JsonConstructor]
+    public SessionFsSqliteQueryType(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        _value = value;
+    }
+
+    /// <summary>Gets the value associated with this <see cref="SessionFsSqliteQueryType"/>.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>Gets the <c>exec</c> value.</summary>
+    public static SessionFsSqliteQueryType Exec { get; } = new("exec");
+
+    /// <summary>Gets the <c>query</c> value.</summary>
+    public static SessionFsSqliteQueryType Query { get; } = new("query");
+
+    /// <summary>Gets the <c>run</c> value.</summary>
+    public static SessionFsSqliteQueryType Run { get; } = new("run");
+
+    /// <summary>Returns a value indicating whether two <see cref="SessionFsSqliteQueryType"/> instances are equivalent.</summary>
+    public static bool operator ==(SessionFsSqliteQueryType left, SessionFsSqliteQueryType right) => left.Equals(right);
+
+    /// <summary>Returns a value indicating whether two <see cref="SessionFsSqliteQueryType"/> instances are not equivalent.</summary>
+    public static bool operator !=(SessionFsSqliteQueryType left, SessionFsSqliteQueryType right) => !(left == right);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is SessionFsSqliteQueryType other && Equals(other);
+
+    /// <inheritdoc />
+    public bool Equals(SessionFsSqliteQueryType other) => string.Equals(Value, other.Value, StringComparison.OrdinalIgnoreCase);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.OrdinalIgnoreCase.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Provides a <see cref="JsonConverter{SessionFsSqliteQueryType}"/> for serializing <see cref="SessionFsSqliteQueryType"/> instances.</summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public sealed class Converter : JsonConverter<SessionFsSqliteQueryType>
+    {
+        /// <inheritdoc />
+        public override SessionFsSqliteQueryType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            return new(GitHub.Copilot.SDK.GeneratedStringEnumJson.ReadValue(ref reader, typeToConvert));
+        }
+
+        /// <inheritdoc />
+        public override void Write(Utf8JsonWriter writer, SessionFsSqliteQueryType value, JsonSerializerOptions options)
+        {
+            GitHub.Copilot.SDK.GeneratedStringEnumJson.WriteValue(writer, value.Value, typeof(SessionFsSqliteQueryType));
+        }
+    }
+}
+
+
 /// <summary>Provides server-scoped RPC methods (no session required).</summary>
 public sealed class ServerRpc
 {
@@ -5210,9 +5328,9 @@ public sealed class ServerSessionFsApi
     }
 
     /// <summary>Calls "sessionFs.setProvider".</summary>
-    public async Task<SessionFsSetProviderResult> SetProviderAsync(string initialCwd, string sessionStatePath, SessionFsSetProviderConventions conventions, CancellationToken cancellationToken = default)
+    public async Task<SessionFsSetProviderResult> SetProviderAsync(string initialCwd, string sessionStatePath, SessionFsSetProviderConventions conventions, bool? handleSqlite = null, CancellationToken cancellationToken = default)
     {
-        var request = new SessionFsSetProviderRequest { InitialCwd = initialCwd, SessionStatePath = sessionStatePath, Conventions = conventions };
+        var request = new SessionFsSetProviderRequest { InitialCwd = initialCwd, SessionStatePath = sessionStatePath, Conventions = conventions, HandleSqlite = handleSqlite };
         return await CopilotClient.InvokeRpcAsync<SessionFsSetProviderResult>(_rpc, "sessionFs.setProvider", [request], cancellationToken);
     }
 }
@@ -6094,6 +6212,8 @@ public interface ISessionFsHandler
     Task<SessionFsError?> RmAsync(SessionFsRmRequest request, CancellationToken cancellationToken = default);
     /// <summary>Handles "sessionFs.rename".</summary>
     Task<SessionFsError?> RenameAsync(SessionFsRenameRequest request, CancellationToken cancellationToken = default);
+    /// <summary>Handles "sessionFs.sqlite".</summary>
+    Task<SessionFsSqliteResult> SqliteAsync(SessionFsSqliteRequest request, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Provides all client session API handler groups for a session.</summary>
@@ -6172,6 +6292,12 @@ internal static class ClientSessionApiRegistration
             var handler = getHandlers(request.SessionId).SessionFs;
             if (handler is null) throw new InvalidOperationException($"No sessionFs handler registered for session: {request.SessionId}");
             return await handler.RenameAsync(request, cancellationToken);
+        }), singleObjectParam: true);
+        rpc.SetLocalRpcMethod("sessionFs.sqlite", (Func<SessionFsSqliteRequest, CancellationToken, ValueTask<SessionFsSqliteResult>>)(async (request, cancellationToken) =>
+        {
+            var handler = getHandlers(request.SessionId).SessionFs;
+            if (handler is null) throw new InvalidOperationException($"No sessionFs handler registered for session: {request.SessionId}");
+            return await handler.SqliteAsync(request, cancellationToken);
         }), singleObjectParam: true);
     }
 }
@@ -6299,6 +6425,8 @@ internal static class ClientSessionApiRegistration
 [JsonSerializable(typeof(SessionFsRmRequest))]
 [JsonSerializable(typeof(SessionFsSetProviderRequest))]
 [JsonSerializable(typeof(SessionFsSetProviderResult))]
+[JsonSerializable(typeof(SessionFsSqliteRequest))]
+[JsonSerializable(typeof(SessionFsSqliteResult))]
 [JsonSerializable(typeof(SessionFsStatRequest))]
 [JsonSerializable(typeof(SessionFsStatResult))]
 [JsonSerializable(typeof(SessionFsWriteFileRequest))]

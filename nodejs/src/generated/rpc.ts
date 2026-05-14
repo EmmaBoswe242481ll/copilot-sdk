@@ -250,6 +250,13 @@ export type SessionFsReaddirWithTypesEntryType = "file" | "directory";
  */
 export type SessionFsSetProviderConventions = "windows" | "posix";
 /**
+ * How to execute the query: 'exec' for DDL/multi-statement (no results), 'query' for SELECT (returns rows), 'run' for INSERT/UPDATE/DELETE (returns rowsAffected)
+ *
+ * This interface was referenced by `_RpcSchemaRoot`'s JSON-Schema
+ * via the `definition` "SessionFsSqliteQueryType".
+ */
+export type SessionFsSqliteQueryType = "exec" | "query" | "run";
+/**
  * Signal to send (default: SIGTERM)
  *
  * This interface was referenced by `_RpcSchemaRoot`'s JSON-Schema
@@ -1951,6 +1958,10 @@ export interface SessionFsSetProviderRequest {
    */
   sessionStatePath: string;
   conventions: SessionFsSetProviderConventions;
+  /**
+   * When true, SQLite queries are routed through the SessionFs provider via RPC. When false or omitted, the runtime uses a local node:sqlite database as a fallback.
+   */
+  handleSqlite?: boolean;
 }
 
 export interface SessionFsSetProviderResult {
@@ -1958,6 +1969,50 @@ export interface SessionFsSetProviderResult {
    * Whether the provider was set successfully
    */
   success: boolean;
+}
+
+export interface SessionFsSqliteRequest {
+  /**
+   * Target session identifier
+   */
+  sessionId: string;
+  /**
+   * Logical database name (e.g., 'session')
+   */
+  dbName: string;
+  /**
+   * SQL query to execute
+   */
+  query: string;
+  queryType: SessionFsSqliteQueryType;
+  /**
+   * Optional named bind parameters
+   */
+  params?: {
+    [k: string]: string | number | null;
+  };
+}
+
+export interface SessionFsSqliteResult {
+  /**
+   * For SELECT: array of row objects. For others: empty array.
+   */
+  rows: {
+    [k: string]: unknown;
+  }[];
+  /**
+   * Column names from the result set
+   */
+  columns: string[];
+  /**
+   * Number of rows affected (for INSERT/UPDATE/DELETE)
+   */
+  rowsAffected: number;
+  /**
+   * Last inserted row ID (for INSERT)
+   */
+  lastInsertRowid?: number;
+  error?: SessionFsError;
 }
 
 export interface SessionFsStatRequest {
@@ -2834,7 +2889,7 @@ export function createServerRpc(connection: MessageConnection) {
         ping: async (params: PingRequest): Promise<PingResult> =>
             connection.sendRequest("ping", params),
         models: {
-            list: async (params?: ModelsListRequest): Promise<ModelList> =>
+            list: async (params: ModelsListRequest): Promise<ModelList> =>
                 connection.sendRequest("models.list", params),
         },
         tools: {
@@ -2842,7 +2897,7 @@ export function createServerRpc(connection: MessageConnection) {
                 connection.sendRequest("tools.list", params),
         },
         account: {
-            getQuota: async (params?: AccountGetQuotaRequest): Promise<AccountGetQuotaResult> =>
+            getQuota: async (params: AccountGetQuotaRequest): Promise<AccountGetQuotaResult> =>
                 connection.sendRequest("account.getQuota", params),
         },
         mcp: {
@@ -3090,6 +3145,7 @@ export interface SessionFsHandler {
     readdirWithTypes(params: SessionFsReaddirWithTypesRequest): Promise<SessionFsReaddirWithTypesResult>;
     rm(params: SessionFsRmRequest): Promise<SessionFsError | undefined>;
     rename(params: SessionFsRenameRequest): Promise<SessionFsError | undefined>;
+    sqlite(params: SessionFsSqliteRequest): Promise<SessionFsSqliteResult>;
 }
 
 /** All client session API handler groups. */
@@ -3156,5 +3212,10 @@ export function registerClientSessionApiHandlers(
         const handler = getHandlers(params.sessionId).sessionFs;
         if (!handler) throw new Error(`No sessionFs handler registered for session: ${params.sessionId}`);
         return handler.rename(params);
+    });
+    connection.onRequest("sessionFs.sqlite", async (params: SessionFsSqliteRequest) => {
+        const handler = getHandlers(params.sessionId).sessionFs;
+        if (!handler) throw new Error(`No sessionFs handler registered for session: ${params.sessionId}`);
+        return handler.sqlite(params);
     });
 }

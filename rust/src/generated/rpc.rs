@@ -97,17 +97,7 @@ pub struct ClientRpcAccount<'a> {
 
 impl<'a> ClientRpcAccount<'a> {
     /// Wire method: `account.getQuota`.
-    pub async fn get_quota(&self) -> Result<AccountGetQuotaResult, Error> {
-        let wire_params = serde_json::json!({});
-        let _value = self
-            .client
-            .call(rpc_methods::ACCOUNT_GETQUOTA, Some(wire_params))
-            .await?;
-        Ok(serde_json::from_value(_value)?)
-    }
-
-    /// Wire method: `account.getQuota`.
-    pub async fn get_quota_with_params(
+    pub async fn get_quota(
         &self,
         params: AccountGetQuotaRequest,
     ) -> Result<AccountGetQuotaResult, Error> {
@@ -221,17 +211,7 @@ pub struct ClientRpcModels<'a> {
 
 impl<'a> ClientRpcModels<'a> {
     /// Wire method: `models.list`.
-    pub async fn list(&self) -> Result<ModelList, Error> {
-        let wire_params = serde_json::json!({});
-        let _value = self
-            .client
-            .call(rpc_methods::MODELS_LIST, Some(wire_params))
-            .await?;
-        Ok(serde_json::from_value(_value)?)
-    }
-
-    /// Wire method: `models.list`.
-    pub async fn list_with_params(&self, params: ModelsListRequest) -> Result<ModelList, Error> {
+    pub async fn list(&self, params: ModelsListRequest) -> Result<ModelList, Error> {
         let wire_params = serde_json::to_value(params)?;
         let _value = self
             .client

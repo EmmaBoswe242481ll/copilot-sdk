@@ -7,7 +7,11 @@ import type {
     SessionFsError,
     SessionFsStatResult,
     SessionFsReaddirWithTypesEntry,
+    SessionFsSqliteResult,
+    SessionFsSqliteQueryType,
 } from "./generated/rpc.js";
+
+export type { SessionFsSqliteQueryType };
 
 /**
  * File metadata returned by {@link SessionFsProvider.stat}.
@@ -15,6 +19,13 @@ import type {
  * `error` field, since providers signal errors by throwing.
  */
 export type SessionFsFileInfo = Omit<SessionFsStatResult, "error">;
+
+/**
+ * Result of a SQLite query execution via {@link SessionFsProvider.sqlite}.
+ * Same shape as the generated {@link SessionFsSqliteResult} but without the
+ * `error` field, since providers signal errors by throwing.
+ */
+export type SessionFsSqliteQueryResult = Omit<SessionFsSqliteResult, "error">;
 
 /**
  * Interface for session filesystem providers. Implementers use idiomatic
@@ -55,6 +66,23 @@ export interface SessionFsProvider {
 
     /** Renames/moves a file or directory. */
     rename(src: string, dest: string): Promise<void>;
+
+    /**
+     * Execute a SQLite query against a named database within this session's storage.
+     * Optional — if provided, the runtime routes SQL through this handler instead of
+     * using a local SQLite database on the host.
+     *
+     * @param dbName - Logical database name (e.g., `"session"`).
+     * @param queryType - How to execute: `"exec"` for DDL/multi-statement, `"query"` for SELECT, `"run"` for INSERT/UPDATE/DELETE.
+     * @param query - SQL query to execute.
+     * @param params - Optional named bind parameters.
+     */
+    sqlite?(
+        dbName: string,
+        queryType: SessionFsSqliteQueryType,
+        query: string,
+        params?: Record<string, string | number | null>,
+    ): Promise<SessionFsSqliteQueryResult | undefined>;
 }
 
 /**
@@ -148,6 +176,13 @@ export function createSessionFsAdapter(provider: SessionFsProvider): SessionFsHa
             } catch (err) {
                 return toSessionFsError(err);
             }
+        },
+        sqlite: async ({ dbName, queryType, query, params: bindParams }) => {
+            if (!provider.sqlite) {
+                throw new Error("SQLite not implemented by this provider");
+            }
+            const result = await provider.sqlite(dbName, queryType, query, bindParams);
+            return result ?? { rows: [], columns: [], rowsAffected: 0 };
         },
     };
 }

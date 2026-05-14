@@ -224,7 +224,7 @@ public partial class SessionTitleChangedEvent : SessionEvent
     public required SessionTitleChangedData Data { get; set; }
 }
 
-/// <summary>Scheduled prompt registered via /every or /after.</summary>
+/// <summary>Scheduled prompt registered via /every.</summary>
 /// <remarks>Represents the <c>session.schedule_created</c> event.</remarks>
 public partial class SessionScheduleCreatedEvent : SessionEvent
 {
@@ -1195,11 +1195,6 @@ public partial class SessionStartData
     [JsonPropertyName("copilotVersion")]
     public required string CopilotVersion { get; set; }
 
-    /// <summary>When set, identifies a parent session whose context this session continues — e.g., a detached headless rem-agent run launched on the parent's interactive shutdown. Telemetry from this session is reported under the parent's session_id.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("detachedFromSpawningParentSessionId")]
-    public string? DetachedFromSpawningParentSessionId { get; set; }
-
     /// <summary>Identifier of the software producing the events (e.g., "copilot-agent").</summary>
     [JsonPropertyName("producer")]
     public required string Producer { get; set; }
@@ -1348,7 +1343,7 @@ public partial class SessionTitleChangedData
     public required string Title { get; set; }
 }
 
-/// <summary>Scheduled prompt registered via /every or /after.</summary>
+/// <summary>Scheduled prompt registered via /every.</summary>
 public partial class SessionScheduleCreatedData
 {
     /// <summary>Sequential id assigned to the scheduled prompt within the session.</summary>
@@ -1362,11 +1357,6 @@ public partial class SessionScheduleCreatedData
     /// <summary>Prompt text that gets enqueued on every tick.</summary>
     [JsonPropertyName("prompt")]
     public required string Prompt { get; set; }
-
-    /// <summary>Whether the schedule re-arms after each tick (`/every`) or fires once (`/after`).</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("recurring")]
-    public bool? Recurring { get; set; }
 }
 
 /// <summary>Scheduled prompt cancelled from the schedule manager dialog.</summary>
@@ -1845,11 +1835,6 @@ public partial class UserMessageData
     [JsonPropertyName("interactionId")]
     public string? InteractionId { get; set; }
 
-    /// <summary>True when this user message was auto-injected by autopilot's continuation loop rather than typed by the user; used to distinguish autopilot-driven turns in telemetry.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("isAutopilotContinuation")]
-    public bool? IsAutopilotContinuation { get; set; }
-
     /// <summary>Path-backed native document attachments that stayed on the tagged_files path flow because native upload would exceed the request size limit.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("nativeDocumentPathFallbackPaths")]
@@ -1937,16 +1922,6 @@ public partial class AssistantStreamingDeltaData
 /// <summary>Assistant response containing text content, optional tool requests, and interaction metadata.</summary>
 public partial class AssistantMessageData
 {
-    /// <summary>Raw Anthropic content array with advisor blocks (server_tool_use, advisor_tool_result) for verbatim round-tripping.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("anthropicAdvisorBlocks")]
-    public object[]? AnthropicAdvisorBlocks { get; set; }
-
-    /// <summary>Anthropic advisor model ID used for this response, for timeline display on replay.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("anthropicAdvisorModel")]
-    public string? AnthropicAdvisorModel { get; set; }
-
     /// <summary>The assistant's text response content.</summary>
     [JsonPropertyName("content")]
     public required string Content { get; set; }
@@ -1964,11 +1939,6 @@ public partial class AssistantMessageData
     /// <summary>Unique identifier for this assistant message.</summary>
     [JsonPropertyName("messageId")]
     public required string MessageId { get; set; }
-
-    /// <summary>Model that produced this assistant message, if known.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("model")]
-    public string? Model { get; set; }
 
     /// <summary>Actual output token count from the API response (completion_tokens), used for accurate token accounting.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2058,11 +2028,6 @@ public partial class AssistantUsageData
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("apiCallId")]
     public string? ApiCallId { get; set; }
-
-    /// <summary>API endpoint used for this model call, matching CAPI supported_endpoints vocabulary.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("apiEndpoint")]
-    public AssistantUsageApiEndpoint? ApiEndpoint { get; set; }
 
     /// <summary>Number of tokens read from prompt cache.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2191,9 +2156,9 @@ public partial class ModelCallFailureData
 /// <summary>Turn abort information including the reason for termination.</summary>
 public partial class AbortData
 {
-    /// <summary>Finite reason code describing why the current turn was aborted.</summary>
+    /// <summary>Reason the current turn was aborted (e.g., "user initiated").</summary>
     [JsonPropertyName("reason")]
-    public required AbortReason Reason { get; set; }
+    public required string Reason { get; set; }
 }
 
 /// <summary>User-initiated tool invocation request with tool name and arguments.</summary>
@@ -2378,11 +2343,6 @@ public partial class SubagentStartedData
     /// <summary>Internal name of the sub-agent.</summary>
     [JsonPropertyName("agentName")]
     public required string AgentName { get; set; }
-
-    /// <summary>Model the sub-agent will run with, when known at start. Surfaced in the timeline for auto-selected sub-agents (e.g. rubber-duck).</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("model")]
-    public string? Model { get; set; }
 
     /// <summary>Tool call ID of the parent tool invocation that spawned this sub-agent.</summary>
     [JsonPropertyName("toolCallId")]
@@ -4201,51 +4161,6 @@ public partial class PermissionRequestHook : PermissionRequest
     public required string ToolName { get; set; }
 }
 
-/// <summary>Extension management permission request.</summary>
-/// <remarks>The <c>extension-management</c> variant of <see cref="PermissionRequest"/>.</remarks>
-public partial class PermissionRequestExtensionManagement : PermissionRequest
-{
-    /// <inheritdoc />
-    [JsonIgnore]
-    public override string Kind => "extension-management";
-
-    /// <summary>Name of the extension being managed.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("extensionName")]
-    public string? ExtensionName { get; set; }
-
-    /// <summary>The extension management operation (scaffold, reload).</summary>
-    [JsonPropertyName("operation")]
-    public required string Operation { get; set; }
-
-    /// <summary>Tool call ID that triggered this permission request.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("toolCallId")]
-    public string? ToolCallId { get; set; }
-}
-
-/// <summary>Extension permission access request.</summary>
-/// <remarks>The <c>extension-permission-access</c> variant of <see cref="PermissionRequest"/>.</remarks>
-public partial class PermissionRequestExtensionPermissionAccess : PermissionRequest
-{
-    /// <inheritdoc />
-    [JsonIgnore]
-    public override string Kind => "extension-permission-access";
-
-    /// <summary>Capabilities the extension is requesting.</summary>
-    [JsonPropertyName("capabilities")]
-    public required string[] Capabilities { get; set; }
-
-    /// <summary>Name of the extension requesting permission access.</summary>
-    [JsonPropertyName("extensionName")]
-    public required string ExtensionName { get; set; }
-
-    /// <summary>Tool call ID that triggered this permission request.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("toolCallId")]
-    public string? ToolCallId { get; set; }
-}
-
 /// <summary>Details of the permission being requested.</summary>
 /// <remarks>Polymorphic base type discriminated by <c>kind</c>.</remarks>
 [JsonPolymorphic(
@@ -4259,8 +4174,6 @@ public partial class PermissionRequestExtensionPermissionAccess : PermissionRequ
 [JsonDerivedType(typeof(PermissionRequestMemory), "memory")]
 [JsonDerivedType(typeof(PermissionRequestCustomTool), "custom-tool")]
 [JsonDerivedType(typeof(PermissionRequestHook), "hook")]
-[JsonDerivedType(typeof(PermissionRequestExtensionManagement), "extension-management")]
-[JsonDerivedType(typeof(PermissionRequestExtensionPermissionAccess), "extension-permission-access")]
 public partial class PermissionRequest
 {
     /// <summary>The type discriminator.</summary>
@@ -4534,51 +4447,6 @@ public partial class PermissionPromptRequestHook : PermissionPromptRequest
     public required string ToolName { get; set; }
 }
 
-/// <summary>Extension management permission prompt.</summary>
-/// <remarks>The <c>extension-management</c> variant of <see cref="PermissionPromptRequest"/>.</remarks>
-public partial class PermissionPromptRequestExtensionManagement : PermissionPromptRequest
-{
-    /// <inheritdoc />
-    [JsonIgnore]
-    public override string Kind => "extension-management";
-
-    /// <summary>Name of the extension being managed.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("extensionName")]
-    public string? ExtensionName { get; set; }
-
-    /// <summary>The extension management operation (scaffold, reload).</summary>
-    [JsonPropertyName("operation")]
-    public required string Operation { get; set; }
-
-    /// <summary>Tool call ID that triggered this permission request.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("toolCallId")]
-    public string? ToolCallId { get; set; }
-}
-
-/// <summary>Extension permission access prompt.</summary>
-/// <remarks>The <c>extension-permission-access</c> variant of <see cref="PermissionPromptRequest"/>.</remarks>
-public partial class PermissionPromptRequestExtensionPermissionAccess : PermissionPromptRequest
-{
-    /// <inheritdoc />
-    [JsonIgnore]
-    public override string Kind => "extension-permission-access";
-
-    /// <summary>Capabilities the extension is requesting.</summary>
-    [JsonPropertyName("capabilities")]
-    public required string[] Capabilities { get; set; }
-
-    /// <summary>Name of the extension requesting permission access.</summary>
-    [JsonPropertyName("extensionName")]
-    public required string ExtensionName { get; set; }
-
-    /// <summary>Tool call ID that triggered this permission request.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("toolCallId")]
-    public string? ToolCallId { get; set; }
-}
-
 /// <summary>Derived user-facing permission prompt details for UI consumers.</summary>
 /// <remarks>Polymorphic base type discriminated by <c>kind</c>.</remarks>
 [JsonPolymorphic(
@@ -4593,8 +4461,6 @@ public partial class PermissionPromptRequestExtensionPermissionAccess : Permissi
 [JsonDerivedType(typeof(PermissionPromptRequestCustomTool), "custom-tool")]
 [JsonDerivedType(typeof(PermissionPromptRequestPath), "path")]
 [JsonDerivedType(typeof(PermissionPromptRequestHook), "hook")]
-[JsonDerivedType(typeof(PermissionPromptRequestExtensionManagement), "extension-management")]
-[JsonDerivedType(typeof(PermissionPromptRequestExtensionPermissionAccess), "extension-permission-access")]
 public partial class PermissionPromptRequest
 {
     /// <summary>The type discriminator.</summary>
@@ -4675,31 +4541,6 @@ public partial class UserToolSessionApprovalCustomTool : UserToolSessionApproval
     public required string ToolName { get; set; }
 }
 
-/// <summary>The <c>extension-management</c> variant of <see cref="UserToolSessionApproval"/>.</summary>
-public partial class UserToolSessionApprovalExtensionManagement : UserToolSessionApproval
-{
-    /// <inheritdoc />
-    [JsonIgnore]
-    public override string Kind => "extension-management";
-
-    /// <summary>Optional operation identifier.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("operation")]
-    public string? Operation { get; set; }
-}
-
-/// <summary>The <c>extension-permission-access</c> variant of <see cref="UserToolSessionApproval"/>.</summary>
-public partial class UserToolSessionApprovalExtensionPermissionAccess : UserToolSessionApproval
-{
-    /// <inheritdoc />
-    [JsonIgnore]
-    public override string Kind => "extension-permission-access";
-
-    /// <summary>Extension name.</summary>
-    [JsonPropertyName("extensionName")]
-    public required string ExtensionName { get; set; }
-}
-
 /// <summary>The approval to add as a session-scoped rule.</summary>
 /// <remarks>Polymorphic base type discriminated by <c>kind</c>.</remarks>
 [JsonPolymorphic(
@@ -4711,8 +4552,6 @@ public partial class UserToolSessionApprovalExtensionPermissionAccess : UserTool
 [JsonDerivedType(typeof(UserToolSessionApprovalMcp), "mcp")]
 [JsonDerivedType(typeof(UserToolSessionApprovalMemory), "memory")]
 [JsonDerivedType(typeof(UserToolSessionApprovalCustomTool), "custom-tool")]
-[JsonDerivedType(typeof(UserToolSessionApprovalExtensionManagement), "extension-management")]
-[JsonDerivedType(typeof(UserToolSessionApprovalExtensionPermissionAccess), "extension-permission-access")]
 public partial class UserToolSessionApproval
 {
     /// <summary>The type discriminator.</summary>
@@ -5536,73 +5375,6 @@ public readonly struct AssistantMessageToolRequestType : IEquatable<AssistantMes
     }
 }
 
-/// <summary>API endpoint used for this model call, matching CAPI supported_endpoints vocabulary.</summary>
-[JsonConverter(typeof(Converter))]
-[DebuggerDisplay("{Value,nq}")]
-public readonly struct AssistantUsageApiEndpoint : IEquatable<AssistantUsageApiEndpoint>
-{
-    private readonly string? _value;
-
-    /// <summary>Initializes a new instance of the <see cref="AssistantUsageApiEndpoint"/> struct.</summary>
-    /// <param name="value">The value to associate with this <see cref="AssistantUsageApiEndpoint"/>.</param>
-    [JsonConstructor]
-    public AssistantUsageApiEndpoint(string value)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(value);
-        _value = value;
-    }
-
-    /// <summary>Gets the value associated with this <see cref="AssistantUsageApiEndpoint"/>.</summary>
-    public string Value => _value ?? string.Empty;
-
-    /// <summary>Gets the <c>/chat/completions</c> value.</summary>
-    public static AssistantUsageApiEndpoint ChatCompletions { get; } = new("/chat/completions");
-
-    /// <summary>Gets the <c>/v1/messages</c> value.</summary>
-    public static AssistantUsageApiEndpoint V1Messages { get; } = new("/v1/messages");
-
-    /// <summary>Gets the <c>/responses</c> value.</summary>
-    public static AssistantUsageApiEndpoint Responses { get; } = new("/responses");
-
-    /// <summary>Gets the <c>ws:/responses</c> value.</summary>
-    public static AssistantUsageApiEndpoint WsResponses { get; } = new("ws:/responses");
-
-    /// <summary>Returns a value indicating whether two <see cref="AssistantUsageApiEndpoint"/> instances are equivalent.</summary>
-    public static bool operator ==(AssistantUsageApiEndpoint left, AssistantUsageApiEndpoint right) => left.Equals(right);
-
-    /// <summary>Returns a value indicating whether two <see cref="AssistantUsageApiEndpoint"/> instances are not equivalent.</summary>
-    public static bool operator !=(AssistantUsageApiEndpoint left, AssistantUsageApiEndpoint right) => !(left == right);
-
-    /// <inheritdoc />
-    public override bool Equals(object? obj) => obj is AssistantUsageApiEndpoint other && Equals(other);
-
-    /// <inheritdoc />
-    public bool Equals(AssistantUsageApiEndpoint other) => string.Equals(Value, other.Value, StringComparison.OrdinalIgnoreCase);
-
-    /// <inheritdoc />
-    public override int GetHashCode() => StringComparer.OrdinalIgnoreCase.GetHashCode(Value);
-
-    /// <inheritdoc />
-    public override string ToString() => Value;
-
-    /// <summary>Provides a <see cref="JsonConverter{AssistantUsageApiEndpoint}"/> for serializing <see cref="AssistantUsageApiEndpoint"/> instances.</summary>
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class Converter : JsonConverter<AssistantUsageApiEndpoint>
-    {
-        /// <inheritdoc />
-        public override AssistantUsageApiEndpoint Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            return new(GitHub.Copilot.SDK.GeneratedStringEnumJson.ReadValue(ref reader, typeToConvert));
-        }
-
-        /// <inheritdoc />
-        public override void Write(Utf8JsonWriter writer, AssistantUsageApiEndpoint value, JsonSerializerOptions options)
-        {
-            GitHub.Copilot.SDK.GeneratedStringEnumJson.WriteValue(writer, value.Value, typeof(AssistantUsageApiEndpoint));
-        }
-    }
-}
-
 /// <summary>Where the failed model call originated.</summary>
 [JsonConverter(typeof(Converter))]
 [DebuggerDisplay("{Value,nq}")]
@@ -5663,70 +5435,6 @@ public readonly struct ModelCallFailureSource : IEquatable<ModelCallFailureSourc
         public override void Write(Utf8JsonWriter writer, ModelCallFailureSource value, JsonSerializerOptions options)
         {
             GitHub.Copilot.SDK.GeneratedStringEnumJson.WriteValue(writer, value.Value, typeof(ModelCallFailureSource));
-        }
-    }
-}
-
-/// <summary>Finite reason code describing why the current turn was aborted.</summary>
-[JsonConverter(typeof(Converter))]
-[DebuggerDisplay("{Value,nq}")]
-public readonly struct AbortReason : IEquatable<AbortReason>
-{
-    private readonly string? _value;
-
-    /// <summary>Initializes a new instance of the <see cref="AbortReason"/> struct.</summary>
-    /// <param name="value">The value to associate with this <see cref="AbortReason"/>.</param>
-    [JsonConstructor]
-    public AbortReason(string value)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(value);
-        _value = value;
-    }
-
-    /// <summary>Gets the value associated with this <see cref="AbortReason"/>.</summary>
-    public string Value => _value ?? string.Empty;
-
-    /// <summary>Gets the <c>user_initiated</c> value.</summary>
-    public static AbortReason UserInitiated { get; } = new("user_initiated");
-
-    /// <summary>Gets the <c>remote_command</c> value.</summary>
-    public static AbortReason RemoteCommand { get; } = new("remote_command");
-
-    /// <summary>Gets the <c>user_abort</c> value.</summary>
-    public static AbortReason UserAbort { get; } = new("user_abort");
-
-    /// <summary>Returns a value indicating whether two <see cref="AbortReason"/> instances are equivalent.</summary>
-    public static bool operator ==(AbortReason left, AbortReason right) => left.Equals(right);
-
-    /// <summary>Returns a value indicating whether two <see cref="AbortReason"/> instances are not equivalent.</summary>
-    public static bool operator !=(AbortReason left, AbortReason right) => !(left == right);
-
-    /// <inheritdoc />
-    public override bool Equals(object? obj) => obj is AbortReason other && Equals(other);
-
-    /// <inheritdoc />
-    public bool Equals(AbortReason other) => string.Equals(Value, other.Value, StringComparison.OrdinalIgnoreCase);
-
-    /// <inheritdoc />
-    public override int GetHashCode() => StringComparer.OrdinalIgnoreCase.GetHashCode(Value);
-
-    /// <inheritdoc />
-    public override string ToString() => Value;
-
-    /// <summary>Provides a <see cref="JsonConverter{AbortReason}"/> for serializing <see cref="AbortReason"/> instances.</summary>
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class Converter : JsonConverter<AbortReason>
-    {
-        /// <inheritdoc />
-        public override AbortReason Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            return new(GitHub.Copilot.SDK.GeneratedStringEnumJson.ReadValue(ref reader, typeToConvert));
-        }
-
-        /// <inheritdoc />
-        public override void Write(Utf8JsonWriter writer, AbortReason value, JsonSerializerOptions options)
-        {
-            GitHub.Copilot.SDK.GeneratedStringEnumJson.WriteValue(writer, value.Value, typeof(AbortReason));
         }
     }
 }
@@ -6707,8 +6415,6 @@ public readonly struct ExtensionsLoadedExtensionStatus : IEquatable<ExtensionsLo
 [JsonSerializable(typeof(PermissionPromptRequest))]
 [JsonSerializable(typeof(PermissionPromptRequestCommands))]
 [JsonSerializable(typeof(PermissionPromptRequestCustomTool))]
-[JsonSerializable(typeof(PermissionPromptRequestExtensionManagement))]
-[JsonSerializable(typeof(PermissionPromptRequestExtensionPermissionAccess))]
 [JsonSerializable(typeof(PermissionPromptRequestHook))]
 [JsonSerializable(typeof(PermissionPromptRequestMcp))]
 [JsonSerializable(typeof(PermissionPromptRequestMemory))]
@@ -6718,8 +6424,6 @@ public readonly struct ExtensionsLoadedExtensionStatus : IEquatable<ExtensionsLo
 [JsonSerializable(typeof(PermissionPromptRequestWrite))]
 [JsonSerializable(typeof(PermissionRequest))]
 [JsonSerializable(typeof(PermissionRequestCustomTool))]
-[JsonSerializable(typeof(PermissionRequestExtensionManagement))]
-[JsonSerializable(typeof(PermissionRequestExtensionPermissionAccess))]
 [JsonSerializable(typeof(PermissionRequestHook))]
 [JsonSerializable(typeof(PermissionRequestMcp))]
 [JsonSerializable(typeof(PermissionRequestMemory))]
@@ -6877,8 +6581,6 @@ public readonly struct ExtensionsLoadedExtensionStatus : IEquatable<ExtensionsLo
 [JsonSerializable(typeof(UserToolSessionApproval))]
 [JsonSerializable(typeof(UserToolSessionApprovalCommands))]
 [JsonSerializable(typeof(UserToolSessionApprovalCustomTool))]
-[JsonSerializable(typeof(UserToolSessionApprovalExtensionManagement))]
-[JsonSerializable(typeof(UserToolSessionApprovalExtensionPermissionAccess))]
 [JsonSerializable(typeof(UserToolSessionApprovalMcp))]
 [JsonSerializable(typeof(UserToolSessionApprovalMemory))]
 [JsonSerializable(typeof(UserToolSessionApprovalRead))]

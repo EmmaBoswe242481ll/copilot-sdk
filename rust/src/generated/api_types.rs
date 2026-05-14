@@ -185,14 +185,8 @@ pub mod rpc_methods {
     pub const SESSIONFS_RM: &str = "sessionFs.rm";
     /// `sessionFs.rename`
     pub const SESSIONFS_RENAME: &str = "sessionFs.rename";
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AccountGetQuotaRequest {
-    /// GitHub token for per-user quota lookup. When provided, resolves this token to determine the user's quota instead of using the global auth.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub git_hub_token: Option<String>,
+    /// `sessionFs.sqlite`
+    pub const SESSIONFS_SQLITE: &str = "sessionFs.sqlite";
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -344,20 +338,6 @@ pub struct CommandsInvokeRequest {
     pub input: Option<String>,
     /// Command name. Leading slashes are stripped and the name is matched case-insensitively.
     pub name: String,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CommandsListRequest {
-    /// Include runtime built-in commands
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub include_builtins: Option<bool>,
-    /// Include commands registered by protocol clients, including SDK clients and extensions
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub include_client_commands: Option<bool>,
-    /// Include enabled user-invocable skills and commands
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub include_skills: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1109,14 +1089,6 @@ pub struct ModelList {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ModelsListRequest {
-    /// GitHub token for per-user model listing. When provided, resolves this token to determine the user's Copilot plan and available models instead of using the global auth.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub git_hub_token: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ModelSwitchToRequest {
     /// Override individual model capabilities resolved by the runtime
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1658,6 +1630,9 @@ pub struct SessionFsRmRequest {
 pub struct SessionFsSetProviderRequest {
     /// Path conventions used by this filesystem
     pub conventions: SessionFsSetProviderConventions,
+    /// When true, SQLite queries are routed through the SessionFs provider via RPC. When false or omitted, the runtime uses a local node:sqlite database as a fallback.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub handle_sqlite: Option<bool>,
     /// Initial working directory for sessions
     pub initial_cwd: String,
     /// Path within each session's SessionFs where the runtime stores files for that session
@@ -1669,6 +1644,37 @@ pub struct SessionFsSetProviderRequest {
 pub struct SessionFsSetProviderResult {
     /// Whether the provider was set successfully
     pub success: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionFsSqliteRequest {
+    /// Logical database name (e.g., 'session')
+    pub db_name: String,
+    /// Optional named bind parameters
+    #[serde(default)]
+    pub params: HashMap<String, serde_json::Value>,
+    /// SQL query to execute
+    pub query: String,
+    /// How to execute the query: 'exec' for DDL/multi-statement (no results), 'query' for SELECT (returns rows), 'run' for INSERT/UPDATE/DELETE (returns rowsAffected)
+    pub query_type: SessionFsSqliteQueryType,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionFsSqliteResult {
+    /// Column names from the result set
+    pub columns: Vec<String>,
+    /// Describes a filesystem error.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<SessionFsError>,
+    /// Last inserted row ID (for INSERT)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_insert_rowid: Option<f64>,
+    /// For SELECT: array of row objects. For others: empty array.
+    pub rows: Vec<HashMap<String, serde_json::Value>>,
+    /// Number of rows affected (for INSERT/UPDATE/DELETE)
+    pub rows_affected: i64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -3691,6 +3697,21 @@ pub enum SessionFsSetProviderConventions {
     Windows,
     #[serde(rename = "posix")]
     Posix,
+    /// Unknown variant for forward compatibility.
+    #[default]
+    #[serde(other)]
+    Unknown,
+}
+
+/// How to execute the query: 'exec' for DDL/multi-statement (no results), 'query' for SELECT (returns rows), 'run' for INSERT/UPDATE/DELETE (returns rowsAffected)
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SessionFsSqliteQueryType {
+    #[serde(rename = "exec")]
+    Exec,
+    #[serde(rename = "query")]
+    Query,
+    #[serde(rename = "run")]
+    Run,
     /// Unknown variant for forward compatibility.
     #[default]
     #[serde(other)]

@@ -168,10 +168,6 @@ func (*AssistantReasoningData) Type() SessionEventType { return SessionEventType
 
 // Assistant response containing text content, optional tool requests, and interaction metadata
 type AssistantMessageData struct {
-	// Raw Anthropic content array with advisor blocks (server_tool_use, advisor_tool_result) for verbatim round-tripping
-	AnthropicAdvisorBlocks []any `json:"anthropicAdvisorBlocks,omitempty"`
-	// Anthropic advisor model ID used for this response, for timeline display on replay
-	AnthropicAdvisorModel *string `json:"anthropicAdvisorModel,omitempty"`
 	// The assistant's text response content
 	Content string `json:"content"`
 	// Encrypted reasoning content from OpenAI models. Session-bound and stripped on resume.
@@ -180,8 +176,6 @@ type AssistantMessageData struct {
 	InteractionID *string `json:"interactionId,omitempty"`
 	// Unique identifier for this assistant message
 	MessageID string `json:"messageId"`
-	// Model that produced this assistant message, if known
-	Model *string `json:"model,omitempty"`
 	// Actual output token count from the API response (completion_tokens), used for accurate token accounting
 	OutputTokens *float64 `json:"outputTokens,omitempty"`
 	// Tool call ID of the parent tool invocation when this event originates from a sub-agent
@@ -522,8 +516,6 @@ func (*SessionInfoData) Type() SessionEventType { return SessionEventTypeSession
 type AssistantUsageData struct {
 	// Completion ID from the model provider (e.g., chatcmpl-abc123)
 	APICallID *string `json:"apiCallId,omitempty"`
-	// API endpoint used for this model call, matching CAPI supported_endpoints vocabulary
-	APIEndpoint *AssistantUsageAPIEndpoint `json:"apiEndpoint,omitempty"`
 	// Number of tokens read from prompt cache
 	CacheReadTokens *float64 `json:"cacheReadTokens,omitempty"`
 	// Number of tokens written to prompt cache
@@ -775,7 +767,7 @@ func (*SessionScheduleCancelledData) Type() SessionEventType {
 	return SessionEventTypeSessionScheduleCancelled
 }
 
-// Scheduled prompt registered via /every or /after
+// Scheduled prompt registered via /every
 type SessionScheduleCreatedData struct {
 	// Sequential id assigned to the scheduled prompt within the session
 	ID int64 `json:"id"`
@@ -783,8 +775,6 @@ type SessionScheduleCreatedData struct {
 	IntervalMs int64 `json:"intervalMs"`
 	// Prompt text that gets enqueued on every tick
 	Prompt string `json:"prompt"`
-	// Whether the schedule re-arms after each tick (`/every`) or fires once (`/after`)
-	Recurring *bool `json:"recurring,omitempty"`
 }
 
 func (*SessionScheduleCreatedData) sessionEventData() {}
@@ -830,8 +820,6 @@ type SessionStartData struct {
 	Context *WorkingDirectoryContext `json:"context,omitempty"`
 	// Version string of the Copilot application
 	CopilotVersion string `json:"copilotVersion"`
-	// When set, identifies a parent session whose context this session continues — e.g., a detached headless rem-agent run launched on the parent's interactive shutdown. Telemetry from this session is reported under the parent's session_id.
-	DetachedFromSpawningParentSessionID *string `json:"detachedFromSpawningParentSessionId,omitempty"`
 	// Identifier of the software producing the events (e.g., "copilot-agent")
 	Producer string `json:"producer"`
 	// Reasoning effort level used for model calls, if applicable (e.g. "low", "medium", "high", "xhigh")
@@ -1148,8 +1136,6 @@ type SubagentStartedData struct {
 	AgentDisplayName string `json:"agentDisplayName"`
 	// Internal name of the sub-agent
 	AgentName string `json:"agentName"`
-	// Model the sub-agent will run with, when known at start. Surfaced in the timeline for auto-selected sub-agents (e.g. rubber-duck).
-	Model *string `json:"model,omitempty"`
 	// Tool call ID of the parent tool invocation that spawned this sub-agent
 	ToolCallID string `json:"toolCallId"`
 }
@@ -1261,8 +1247,8 @@ func (*ToolExecutionStartData) Type() SessionEventType { return SessionEventType
 
 // Turn abort information including the reason for termination
 type AbortData struct {
-	// Finite reason code describing why the current turn was aborted
-	Reason AbortReason `json:"reason"`
+	// Reason the current turn was aborted (e.g., "user initiated")
+	Reason string `json:"reason"`
 }
 
 func (*AbortData) sessionEventData()      {}
@@ -1341,8 +1327,6 @@ type UserMessageData struct {
 	Content string `json:"content"`
 	// CAPI interaction ID for correlating this user message with its turn
 	InteractionID *string `json:"interactionId,omitempty"`
-	// True when this user message was auto-injected by autopilot's continuation loop rather than typed by the user; used to distinguish autopilot-driven turns in telemetry.
-	IsAutopilotContinuation *bool `json:"isAutopilotContinuation,omitempty"`
 	// Path-backed native document attachments that stayed on the tagged_files path flow because native upload would exceed the request size limit
 	NativeDocumentPathFallbackPaths []string `json:"nativeDocumentPathFallbackPaths,omitempty"`
 	// Parent agent task ID for background telemetry correlated to this user turn
@@ -1670,36 +1654,6 @@ func (PermissionPromptRequestCustomTool) Kind() PermissionPromptRequestKind {
 	return PermissionPromptRequestKindCustomTool
 }
 
-// Extension management permission prompt
-type PermissionPromptRequestExtensionManagement struct {
-	// Name of the extension being managed
-	ExtensionName *string `json:"extensionName,omitempty"`
-	// The extension management operation (scaffold, reload)
-	Operation string `json:"operation"`
-	// Tool call ID that triggered this permission request
-	ToolCallID *string `json:"toolCallId,omitempty"`
-}
-
-func (PermissionPromptRequestExtensionManagement) permissionPromptRequest() {}
-func (PermissionPromptRequestExtensionManagement) Kind() PermissionPromptRequestKind {
-	return PermissionPromptRequestKindExtensionManagement
-}
-
-// Extension permission access prompt
-type PermissionPromptRequestExtensionPermissionAccess struct {
-	// Capabilities the extension is requesting
-	Capabilities []string `json:"capabilities"`
-	// Name of the extension requesting permission access
-	ExtensionName string `json:"extensionName"`
-	// Tool call ID that triggered this permission request
-	ToolCallID *string `json:"toolCallId,omitempty"`
-}
-
-func (PermissionPromptRequestExtensionPermissionAccess) permissionPromptRequest() {}
-func (PermissionPromptRequestExtensionPermissionAccess) Kind() PermissionPromptRequestKind {
-	return PermissionPromptRequestKindExtensionPermissionAccess
-}
-
 // Hook confirmation permission prompt
 type PermissionPromptRequestHook struct {
 	// Optional message from the hook explaining why confirmation is needed
@@ -1856,36 +1810,6 @@ type PermissionRequestCustomTool struct {
 func (PermissionRequestCustomTool) permissionRequest() {}
 func (PermissionRequestCustomTool) Kind() PermissionRequestKind {
 	return PermissionRequestKindCustomTool
-}
-
-// Extension management permission request
-type PermissionRequestExtensionManagement struct {
-	// Name of the extension being managed
-	ExtensionName *string `json:"extensionName,omitempty"`
-	// The extension management operation (scaffold, reload)
-	Operation string `json:"operation"`
-	// Tool call ID that triggered this permission request
-	ToolCallID *string `json:"toolCallId,omitempty"`
-}
-
-func (PermissionRequestExtensionManagement) permissionRequest() {}
-func (PermissionRequestExtensionManagement) Kind() PermissionRequestKind {
-	return PermissionRequestKindExtensionManagement
-}
-
-// Extension permission access request
-type PermissionRequestExtensionPermissionAccess struct {
-	// Capabilities the extension is requesting
-	Capabilities []string `json:"capabilities"`
-	// Name of the extension requesting permission access
-	ExtensionName string `json:"extensionName"`
-	// Tool call ID that triggered this permission request
-	ToolCallID *string `json:"toolCallId,omitempty"`
-}
-
-func (PermissionRequestExtensionPermissionAccess) permissionRequest() {}
-func (PermissionRequestExtensionPermissionAccess) Kind() PermissionRequestKind {
-	return PermissionRequestKindExtensionPermissionAccess
 }
 
 // Hook confirmation permission request
@@ -2666,26 +2590,6 @@ func (UserToolSessionApprovalCustomTool) Kind() UserToolSessionApprovalKind {
 	return UserToolSessionApprovalKindCustomTool
 }
 
-type UserToolSessionApprovalExtensionManagement struct {
-	// Optional operation identifier
-	Operation *string `json:"operation,omitempty"`
-}
-
-func (UserToolSessionApprovalExtensionManagement) userToolSessionApproval() {}
-func (UserToolSessionApprovalExtensionManagement) Kind() UserToolSessionApprovalKind {
-	return UserToolSessionApprovalKindExtensionManagement
-}
-
-type UserToolSessionApprovalExtensionPermissionAccess struct {
-	// Extension name
-	ExtensionName string `json:"extensionName"`
-}
-
-func (UserToolSessionApprovalExtensionPermissionAccess) userToolSessionApproval() {}
-func (UserToolSessionApprovalExtensionPermissionAccess) Kind() UserToolSessionApprovalKind {
-	return UserToolSessionApprovalKindExtensionPermissionAccess
-}
-
 type UserToolSessionApprovalMcp struct {
 	// MCP server name
 	ServerName string `json:"serverName"`
@@ -2742,31 +2646,12 @@ type WorkingDirectoryContext struct {
 	RepositoryHost *string `json:"repositoryHost,omitempty"`
 }
 
-// Finite reason code describing why the current turn was aborted
-type AbortReason string
-
-const (
-	AbortReasonRemoteCommand AbortReason = "remote_command"
-	AbortReasonUserAbort     AbortReason = "user_abort"
-	AbortReasonUserInitiated AbortReason = "user_initiated"
-)
-
 // Tool call type: "function" for standard tool calls, "custom" for grammar-based tool calls. Defaults to "function" when absent.
 type AssistantMessageToolRequestType string
 
 const (
 	AssistantMessageToolRequestTypeCustom   AssistantMessageToolRequestType = "custom"
 	AssistantMessageToolRequestTypeFunction AssistantMessageToolRequestType = "function"
-)
-
-// API endpoint used for this model call, matching CAPI supported_endpoints vocabulary
-type AssistantUsageAPIEndpoint string
-
-const (
-	AssistantUsageAPIEndpointChatCompletions AssistantUsageAPIEndpoint = "/chat/completions"
-	AssistantUsageAPIEndpointResponses       AssistantUsageAPIEndpoint = "/responses"
-	AssistantUsageAPIEndpointV1Messages      AssistantUsageAPIEndpoint = "/v1/messages"
-	AssistantUsageAPIEndpointWsResponses     AssistantUsageAPIEndpoint = "ws:/responses"
 )
 
 // The user action: "accept" (submitted form), "decline" (explicitly refused), or "cancel" (dismissed)
@@ -2863,17 +2748,15 @@ const (
 type PermissionPromptRequestKind string
 
 const (
-	PermissionPromptRequestKindCommands                  PermissionPromptRequestKind = "commands"
-	PermissionPromptRequestKindCustomTool                PermissionPromptRequestKind = "custom-tool"
-	PermissionPromptRequestKindExtensionManagement       PermissionPromptRequestKind = "extension-management"
-	PermissionPromptRequestKindExtensionPermissionAccess PermissionPromptRequestKind = "extension-permission-access"
-	PermissionPromptRequestKindHook                      PermissionPromptRequestKind = "hook"
-	PermissionPromptRequestKindMcp                       PermissionPromptRequestKind = "mcp"
-	PermissionPromptRequestKindMemory                    PermissionPromptRequestKind = "memory"
-	PermissionPromptRequestKindPath                      PermissionPromptRequestKind = "path"
-	PermissionPromptRequestKindRead                      PermissionPromptRequestKind = "read"
-	PermissionPromptRequestKindURL                       PermissionPromptRequestKind = "url"
-	PermissionPromptRequestKindWrite                     PermissionPromptRequestKind = "write"
+	PermissionPromptRequestKindCommands   PermissionPromptRequestKind = "commands"
+	PermissionPromptRequestKindCustomTool PermissionPromptRequestKind = "custom-tool"
+	PermissionPromptRequestKindHook       PermissionPromptRequestKind = "hook"
+	PermissionPromptRequestKindMcp        PermissionPromptRequestKind = "mcp"
+	PermissionPromptRequestKindMemory     PermissionPromptRequestKind = "memory"
+	PermissionPromptRequestKindPath       PermissionPromptRequestKind = "path"
+	PermissionPromptRequestKindRead       PermissionPromptRequestKind = "read"
+	PermissionPromptRequestKindURL        PermissionPromptRequestKind = "url"
+	PermissionPromptRequestKindWrite      PermissionPromptRequestKind = "write"
 )
 
 // Whether this is a store or vote memory operation
@@ -2905,16 +2788,14 @@ const (
 type PermissionRequestKind string
 
 const (
-	PermissionRequestKindCustomTool                PermissionRequestKind = "custom-tool"
-	PermissionRequestKindExtensionManagement       PermissionRequestKind = "extension-management"
-	PermissionRequestKindExtensionPermissionAccess PermissionRequestKind = "extension-permission-access"
-	PermissionRequestKindHook                      PermissionRequestKind = "hook"
-	PermissionRequestKindMcp                       PermissionRequestKind = "mcp"
-	PermissionRequestKindMemory                    PermissionRequestKind = "memory"
-	PermissionRequestKindRead                      PermissionRequestKind = "read"
-	PermissionRequestKindShell                     PermissionRequestKind = "shell"
-	PermissionRequestKindURL                       PermissionRequestKind = "url"
-	PermissionRequestKindWrite                     PermissionRequestKind = "write"
+	PermissionRequestKindCustomTool PermissionRequestKind = "custom-tool"
+	PermissionRequestKindHook       PermissionRequestKind = "hook"
+	PermissionRequestKindMcp        PermissionRequestKind = "mcp"
+	PermissionRequestKindMemory     PermissionRequestKind = "memory"
+	PermissionRequestKindRead       PermissionRequestKind = "read"
+	PermissionRequestKindShell      PermissionRequestKind = "shell"
+	PermissionRequestKindURL        PermissionRequestKind = "url"
+	PermissionRequestKindWrite      PermissionRequestKind = "write"
 )
 
 // Whether this is a store or vote memory operation
@@ -3047,14 +2928,12 @@ const (
 type UserToolSessionApprovalKind string
 
 const (
-	UserToolSessionApprovalKindCommands                  UserToolSessionApprovalKind = "commands"
-	UserToolSessionApprovalKindCustomTool                UserToolSessionApprovalKind = "custom-tool"
-	UserToolSessionApprovalKindExtensionManagement       UserToolSessionApprovalKind = "extension-management"
-	UserToolSessionApprovalKindExtensionPermissionAccess UserToolSessionApprovalKind = "extension-permission-access"
-	UserToolSessionApprovalKindMcp                       UserToolSessionApprovalKind = "mcp"
-	UserToolSessionApprovalKindMemory                    UserToolSessionApprovalKind = "memory"
-	UserToolSessionApprovalKindRead                      UserToolSessionApprovalKind = "read"
-	UserToolSessionApprovalKindWrite                     UserToolSessionApprovalKind = "write"
+	UserToolSessionApprovalKindCommands   UserToolSessionApprovalKind = "commands"
+	UserToolSessionApprovalKindCustomTool UserToolSessionApprovalKind = "custom-tool"
+	UserToolSessionApprovalKindMcp        UserToolSessionApprovalKind = "mcp"
+	UserToolSessionApprovalKindMemory     UserToolSessionApprovalKind = "memory"
+	UserToolSessionApprovalKindRead       UserToolSessionApprovalKind = "read"
+	UserToolSessionApprovalKindWrite      UserToolSessionApprovalKind = "write"
 )
 
 // Hosting platform type of the repository (github or ado)

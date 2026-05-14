@@ -1297,6 +1297,7 @@ public sealed partial class CopilotClient : IDisposable, IAsyncDisposable
             _options.SessionFs.InitialCwd,
             _options.SessionFs.SessionStatePath,
             _options.SessionFs.Conventions,
+            handleSqlite: false, // .NET SQLite support not yet implemented
             cancellationToken);
     }
 
