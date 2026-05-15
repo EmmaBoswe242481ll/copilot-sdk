@@ -1,0 +1,67 @@
+{
+  "name": "copilot-sdk",
+  "version": "0.1.0",
+  "description": "A TypeScript SDK for building GitHub Copilot Extensions and integrations",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "github",
+    "copilot",
+    "sdk",
+    "ai",
+    "extensions",
+    "typescript"
+  ],
+  "author": "GitHub",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@octokit/core": "^6.1.2",
+    "@octokit/types": "^13.5.0",
+    "eventsource-parser": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^7.13.0",
+    "@typescript-eslint/parser": "^7.13.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "eslint": "^8.57.0",
+    "tsup": "^8.1.0",
+    "typescript": "^5.5.2",
+    "vitest": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/github/copilot-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/github/copilot-sdk/issues"
+  },
+  "homepage": "https://github.com/github/copilot-sdk#readme"
+}
